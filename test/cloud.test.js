@@ -5,6 +5,15 @@ const assert = require("node:assert/strict");
 const http = require("http");
 const { CloudClient, hawkHeader, CloudError } = require("../lib/cloud");
 
+function closeServer(server) {
+    return new Promise((resolve) => {
+        if (typeof server.closeAllConnections === "function") {
+            server.closeAllConnections();
+        }
+        server.close(resolve);
+    });
+}
+
 describe("cloud api", () => {
     test("hawk header matches python-roborock", () => {
         const header = hawkHeader(
@@ -117,7 +126,7 @@ describe("cloud api", () => {
             assert.equal(home.devices[0].firmware, "02.16.12");
             assert.equal(home.rooms[0].name, "Kitchen");
         } finally {
-            await new Promise((resolve) => server.close(resolve));
+            await closeServer(server);
         }
     });
 
@@ -152,7 +161,7 @@ describe("cloud api", () => {
                 return true;
             });
         } finally {
-            await new Promise((resolve) => server.close(resolve));
+            await closeServer(server);
         }
     });
 

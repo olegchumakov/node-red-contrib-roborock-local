@@ -46,7 +46,7 @@
   },
   "scripts": {
     "lint": "eslint .",
-    "test": "node --test --test-timeout 30000 test/*.test.js",
+    "test": "node test/run.js",
     "local-test": "node ./bin/roborock-local-test.js",
     "cloud-login": "node ./bin/roborock-cloud-login.js"
   },
