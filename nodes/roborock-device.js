@@ -13,7 +13,8 @@ module.exports = function (RED) {
         this.protocol = config.protocol || "auto";
         this.firmware = config.firmware || "";
         this.pv = config.pv || "";
-        this.rooms = parseRooms(config.rooms);
+        // rooms / map selection saved by 0.1.x and 0.2.0 are ignored.
+        // Maps are not stored on this node; commands carry the ids.
         this.port = Number(config.port) > 0 ? Number(config.port) : undefined;
         this.helloTimeoutMs = Number(config.helloTimeoutMs) > 0 ? Number(config.helloTimeoutMs) : undefined;
         this.requestTimeoutMs = Number(config.requestTimeoutMs) > 0 ? Number(config.requestTimeoutMs) : undefined;
@@ -53,17 +54,3 @@ function hintLegacySession(node) {
     node.warn("Cloud login saved on this device node is ignored. Local control still uses the IP, DUID, and local key stored here. Sign in on a roborock account node, select it, and use Fetch devices from account.");
 }
 
-function parseRooms(value) {
-    if (Array.isArray(value)) {
-        return value;
-    }
-    if (!value) {
-        return [];
-    }
-    try {
-        const parsed = JSON.parse(value);
-        return Array.isArray(parsed) ? parsed : [];
-    } catch (_err) {
-        return [];
-    }
-}

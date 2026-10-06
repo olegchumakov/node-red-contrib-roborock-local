@@ -6,13 +6,17 @@ const dgram = require("dgram");
 const { RoborockClient } = require("../lib/client");
 const { discover } = require("../lib/discovery");
 const { parseImportedSession, CloudError } = require("../lib/cloud");
-const { resolveCommand, segmentIdForName, assertReadOnlyCommand } = require("../lib/commands");
+const { segmentIdForName, assertReadOnlyCommand, resolveCommand, isMapRoomsCommand } = require("../lib/commands");
 const {
     currentMapFlag,
     normalizeMapList,
     normalizeSegments,
     emptySegmentWarning,
-    describeMaps
+    describeMaps,
+    buildMapCatalog,
+    resolveRoomTargets,
+    ROOMS_WHEN_LOADED,
+    NO_ROOM_MAPPING
 } = require("../lib/maps");
 
 describe("maps and protocol selection", () => {
@@ -56,13 +60,91 @@ describe("maps and protocol selection", () => {
 
     test("empty mapping does not claim lab_status means missing room splits", () => {
         const warning = emptySegmentWarning({ mapName: "1 этаж" });
-        assert.match(warning, /no rooms split/);
-        assert.match(warning, /whole-floor cleaning works/);
-        assert.match(warning, /Roborock app/);
+        assert.equal(warning, NO_ROOM_MAPPING);
         assert.equal(warning.includes("lab_status"), false);
         assert.equal(warning.includes("unsave_map_flag"), false);
         assert.equal(warning.includes("often means"), false);
         assert.equal(warning.includes("Главная спальня"), false);
+    });
+
+    test("catalog keeps rooms from map_info and names only linked segments", () => {
+        const maps = normalizeMapList([{
+            map_info: [
+                { mapFlag: 1, name: "2 этаж" },
+                {
+                    mapFlag: 2,
+                    name: "1 этаж",
+                    rooms: [
+                        { id: 16, tag: 1, iot_name_id: "1", iot_name: "Спальня" },
+                        { id: 17, tag: 2, iot_name_id: "2", iot_name: "Кухня" },
+                        { id: 18, tag: 3, iot_name_id: "-1", iot_name: "" },
+                        { id: 19, tag: 4 }
+                    ]
+                }
+            ]
+        }]);
+        assert.equal(maps[0].rooms, null);
+        assert.equal(maps[1].rooms.length, 4);
+        const cloudRooms = [
+            { id: 1, name: "Главная спальня" },
+            { id: 2, name: "Гостиная" },
+            { id: 99, name: "Kitchen" }
+        ];
+        // map_status 7 -> flag 1, so "2 этаж" is loaded. Mapping links segment 20 to cloud room 99.
+        // The third tuple value is a room tag, not a map flag.
+        const catalog = buildMapCatalog({
+            maps,
+            mapping: [[20, "99", 12]],
+            currentMapFlag: 1,
+            cloudRooms
+        });
+        assert.equal(catalog.currentMapFlag, 1);
+        assert.equal(catalog.maps[0].current, true);
+        assert.deepEqual(catalog.maps[0].segments, [{ segmentId: 20, name: "Kitchen" }]);
+        assert.equal(catalog.maps[1].current, false);
+        assert.deepEqual(catalog.maps[1].segments, [
+            { segmentId: 16, name: "Спальня" },
+            { segmentId: 17, name: "Кухня" },
+            { segmentId: 18 },
+            { segmentId: 19 }
+        ]);
+        const dumped = JSON.stringify(catalog);
+        assert.equal(dumped.includes("Главная спальня"), false);
+        assert.equal(dumped.includes("Гостиная"), false);
+        assert.equal(resolveRoomTargets(["Kitchen"], catalog)[0], 20);
+        assert.deepEqual(resolveRoomTargets(["Room 16", "16"], null), [16, 16]);
+        assert.throws(() => resolveRoomTargets(["Главная спальня"], catalog), /No segment id/);
+        assert.throws(() => resolveRoomTargets(["Спальня"], catalog), /not the loaded map/);
+    });
+
+    test("a floor without map_info rooms says they are visible once that map is loaded", () => {
+        const maps = normalizeMapList([{
+            map_info: [
+                { mapFlag: 1, name: "2 этаж" },
+                { mapFlag: 2, name: "1 этаж" }
+            ]
+        }]);
+        const catalog = buildMapCatalog({
+            maps,
+            mapping: [],
+            currentMapFlag: 1,
+            cloudRooms: [{ id: 1, name: "Главная спальня" }]
+        });
+        assert.equal(catalog.maps[0].note, NO_ROOM_MAPPING);
+        assert.equal(catalog.maps[1].note, ROOMS_WHEN_LOADED);
+        assert.equal(JSON.stringify(catalog).includes("Главная спальня"), false);
+        const segments = normalizeSegments([[16, "14731399", 12]], undefined);
+        assert.equal(segments[0].segmentId, 16);
+        assert.equal(segments[0].roomId, "14731399");
+        assert.equal(segments[0].mapFlag, undefined);
+    });
+
+    test("map_rooms is not sent as a raw robot method", () => {
+        assert.equal(isMapRoomsCommand({ command: "map_rooms" }), true);
+        assert.equal(isMapRoomsCommand("maps_rooms"), true);
+        assert.equal(isMapRoomsCommand({ command: "maps" }), false);
+        assert.throws(() => resolveCommand({ command: "map_rooms" }), /vacuum node/);
+        assert.equal(resolveCommand({ command: "maps" }).method, "get_multi_maps_list");
     });
 
     test("auto with pv 1.0 skips L01, forced L01 does not", () => {

@@ -47,19 +47,14 @@
         <button type="button" class="red-ui-button" id="rr-discover">Find on LAN</button>
     </div>
     <div class="form-tips">The cloud response usually has no IP. Discovery listens for a few seconds on UDP 58866. If Home Assistant's Roborock integration is already bound to that port on this machine, type the IP. IP, DUID, local key, and model are credentials, not flow properties.</div>
-    <details id="rr-maps-section" style="margin:10px 0;">
-        <summary style="cursor:pointer;">Maps &amp; rooms (optional)</summary>
-        <div class="form-tips">Only needed for room cleaning. Start, dock, and whole-floor cleaning do not use this. An empty room list is normal when the floor has not been split into rooms in the Roborock app.</div>
-        <div class="form-row">
-            <button type="button" class="red-ui-button" id="rr-map-rooms">Read maps</button>
-        </div>
-        <div id="rr-map-list" style="margin:8px 0;"></div>
-        <div id="rr-segment-list" style="margin:4px 0;"></div>
-        <div class="form-tips" id="rr-map-note"></div>
-    </details>
+    <div class="form-row">
+        <button type="button" class="red-ui-button" id="rr-show-maps">Show maps &amp; rooms</button>
+    </div>
+    <div id="rr-map-list" style="margin:8px 0;"></div>
+    <div class="form-tips" id="rr-map-note"></div>
+    <div class="form-tips">Read-only reference. Nothing here is saved, and the robot's loaded map is not changed. Switch floors and clean rooms with vacuum commands, for example <code>{"command":"map","mapFlag":1}</code> and <code>{"command":"rooms","segments":[16]}</code>.</div>
     <input type="hidden" id="node-config-input-firmware">
     <input type="hidden" id="node-config-input-pv">
-    <input type="hidden" id="node-config-input-rooms">
 </script>
 
 <script type="text/html" data-help-name="roborock-device">
@@ -82,7 +77,6 @@
     "account": "account1",
     "protocol": "auto",
     "pv": "1.0",
-    "rooms": "[]",
     "credentials": {
       "ip": "192.168.1.20",
       "duid": "YOUR_DUID",
@@ -95,8 +89,15 @@
     <p>Paste IP, DUID, and local_key if you already have them (for example from <code>roborock-cloud-login</code>). An account is optional when those values are already filled in.</p>
     <h3>Refreshing a key</h3>
     <p>Re-pairing or a Wi-Fi reset rotates <code>local_key</code>. Sign in on the account node if the saved session expired, fetch the device again, and deploy. Timeouts and "decrypt failed" point at a stale key or a wrong IP, not at the cloud.</p>
-    <h3>Maps and rooms (optional)</h3>
-    <p>Open <b>Maps &amp; rooms (optional)</b> only when you want to clean specific rooms. <b>Read maps</b> lists floors. The loaded floor is marked current. <b>Load</b> sends <code>load_multi_map</code> with a numeric map flag and switches the robot to that floor. If <code>get_room_mapping</code> returns <code>[]</code>, the floor has no room split. That is normal: whole-floor cleaning still works, and rooms are added in the Roborock app. Pass segment ids in the vacuum message, for example <code>{"command":"rooms","segments":[16]}</code> or <code>{"command":"map","mapFlag":1}</code>.</p>
+    <h3>Maps and rooms</h3>
+    <p><b>Show maps &amp; rooms</b> asks the robot for its floors and room ids and prints them in this dialog. It does not save anything on the node, and it does not call <code>load_multi_map</code>. The loaded floor is marked <code>(loaded)</code>.</p>
+    <p><code>get_room_mapping</code> returns segments only for the loaded map, as <code>[segmentId, cloudRoomId, tag]</code>. An empty list means that loaded map reported no rooms. Other floors are listed from <code>get_multi_maps_list</code>. When that response includes a <code>rooms</code> array, those ids are shown too. When it does not, the line is <code>rooms visible when this map is loaded</code>. Switch first with a vacuum command, then show the list again, to see that floor's segments.</p>
+    <p>A room name is shown beside an id only when it is actually tied to that segment: either <code>get_room_mapping</code> links the segment to a cloud home room id from the account session, or the map list itself sent <code>iot_name</code> on that room. Home rooms that are not linked (old names still sitting on the account) are not shown. If the account session is missing, you still get the ids.</p>
+    <p>Control stays on the vacuum node:</p>
+    <pre>{"command":"map_rooms"}
+{"command":"map","mapFlag":1}
+{"command":"rooms","segments":[16,17]}
+{"command":"rooms","names":["Kitchen"]}</pre>
     <p>Auto protocol uses the account <code>pv</code> when it is <code>1.0</code> and does not wait for an L01 hello. Choosing L01 still tries L01 and reports <code>No CONNACK for L01</code> if the firmware does not speak it.</p>
     <p>A cloud session that was saved on this device node in an older version is ignored. Local control keeps using the IP, DUID, and local key.</p>
 </script>
@@ -161,8 +162,7 @@
             deviceName: { value: "" },
             protocol: { value: "auto" },
             firmware: { value: "" },
-            pv: { value: "" },
-            rooms: { value: "[]" }
+            pv: { value: "" }
         },
         credentials: {
             ip: { type: "text" },
@@ -175,71 +175,41 @@
         },
         oneditprepare: function () {
             const node = this;
-            node._segments = [];
-            node._currentMapFlag = null;
-            const noRoomsNote = "This map has no rooms split; whole-floor cleaning works, rooms can be added in the Roborock app.";
-            try {
-                const parsed = JSON.parse($("#node-config-input-rooms").val() || "[]");
-                if (Array.isArray(parsed)) {
-                    node._segments = parsed;
-                }
-            } catch (err) {
-                node._segments = [];
-            }
             function setMapNote(text) {
                 $("#rr-map-note").text(text || "");
             }
-            function renderSegments(segments) {
-                const host = $("#rr-segment-list").empty();
-                (segments || []).forEach(function (segment) {
-                    host.append($("<div class='form-tips'></div>").text(segment.name + " · segment " + segment.segmentId));
-                });
+            function segmentLabel(segment) {
+                return segment.name ? (segment.segmentId + " " + segment.name) : String(segment.segmentId);
             }
-            function storeSegments(segments) {
-                node._segments = segments || [];
-                $("#node-config-input-rooms").val(JSON.stringify(node._segments));
-                renderSegments(node._segments);
-            }
-            function renderMaps(data) {
+            function renderCatalog(data) {
                 const host = $("#rr-map-list").empty();
-                (data.maps || []).forEach(function (map) {
-                    const row = $("<div style='margin:4px 0'></div>");
-                    const label = (map.name || ("Map " + map.mapFlag)) + (map.current ? " (current)" : "");
-                    row.append($("<span></span>").text(label + " "));
-                    if (!map.current) {
-                        const button = $("<button type='button' class='red-ui-button'>Load</button>");
-                        button.on("click", function () {
-                            readMaps("load", Number(map.mapFlag));
+                const maps = data.maps || [];
+                if (!maps.length) {
+                    host.append($("<div class='form-tips'></div>").text(data.mapsError || "No saved maps returned."));
+                }
+                maps.forEach(function (map) {
+                    const block = $("<div style='margin:6px 0'></div>");
+                    const title = (map.name || ("Map " + map.mapFlag)) + " · map " + map.mapFlag + (map.current ? " (loaded)" : "");
+                    block.append($("<div></div>").text(title));
+                    if (map.segments && map.segments.length) {
+                        map.segments.forEach(function (segment) {
+                            block.append($("<div class='form-tips'></div>").text("room " + segmentLabel(segment)));
                         });
-                        row.append(button);
+                    } else if (map.note) {
+                        block.append($("<div class='form-tips'></div>").text(map.note));
                     }
-                    host.append(row);
+                    host.append(block);
                 });
-            }
-            function applyMapResult(data) {
-                node._currentMapFlag = data.currentMapFlag === undefined ? null : data.currentMapFlag;
-                renderMaps(data);
-                if (data.segments && data.segments.length) {
-                    const merged = data.segments.map(function (segment) {
-                        const prev = (node._segments || []).find(function (item) {
-                            return Number(item.segmentId) === Number(segment.segmentId);
-                        });
-                        if (prev && prev.name && prev.name !== ("Room " + prev.segmentId)) {
-                            return Object.assign({}, segment, { name: prev.name });
-                        }
-                        return segment;
+                if (data.loadedSegments && data.loadedSegments.length) {
+                    const extra = $("<div style='margin:6px 0'></div>");
+                    extra.append($("<div class='form-tips'></div>").text(data.loadedSegmentsNote || "Loaded map rooms"));
+                    data.loadedSegments.forEach(function (segment) {
+                        extra.append($("<div class='form-tips'></div>").text("room " + segmentLabel(segment)));
                     });
-                    storeSegments(merged);
-                    setMapNote("");
-                } else if (data.mappingError) {
-                    renderSegments([]);
-                    setMapNote("Could not read rooms for this map. The floor list is still shown. Whole-floor cleaning still works.");
-                } else {
-                    renderSegments([]);
-                    setMapNote(noRoomsNote);
+                    host.append(extra);
                 }
             }
-            function readMaps(action, mapFlag) {
+            function showMaps() {
                 const key = $("#node-config-input-localKey").val();
                 const body = {
                     ip: $("#node-config-input-ip").val(),
@@ -247,16 +217,20 @@
                     protocol: $("#node-config-input-protocol").val(),
                     pv: $("#node-config-input-pv").val(),
                     nodeId: node.id,
-                    action: action || "read"
+                    accountId: $("#node-config-input-account").val() || ""
                 };
-                if (mapFlag !== undefined && mapFlag !== null) {
-                    body.mapFlag = mapFlag;
-                }
                 if (key && key !== "__PWRD__") {
                     body.localKey = key;
                 }
-                setMapNote(action === "load" ? "Switching the robot to that floor..." : "Reading maps...");
-                postJSON("roborock-local/map-rooms", body).done(applyMapResult).fail(function (xhr) {
+                setMapNote("Reading maps...");
+                postJSON("roborock-local/map-rooms", body).done(function (data) {
+                    renderCatalog(data);
+                    if (data.mappingError) {
+                        setMapNote("Could not read rooms for the loaded map. Floors are still listed. " + data.mappingError);
+                    } else {
+                        setMapNote("");
+                    }
+                }).fail(function (xhr) {
                     setMapNote((xhr.responseJSON && xhr.responseJSON.error) || "Could not read maps");
                 });
             }
@@ -393,8 +367,8 @@
                     setStatus((xhr.responseJSON && xhr.responseJSON.error) || "Discovery failed", true);
                 });
             });
-            $("#rr-map-rooms").on("click", function () {
-                readMaps("read");
+            $("#rr-show-maps").on("click", function () {
+                showMaps();
             });
         }
     });
