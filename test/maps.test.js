@@ -56,10 +56,9 @@ describe("maps and protocol selection", () => {
 
     test("empty mapping does not claim lab_status means missing room splits", () => {
         const warning = emptySegmentWarning({ mapName: "1 этаж" });
-        assert.match(warning, /No segments returned for the current map "1 этаж"/);
-        assert.match(warning, /Enter numbered segment ids by hand/);
-        assert.match(warning, /load another map and read again/);
-        assert.match(warning, /Cloud home room names are not used/);
+        assert.match(warning, /no rooms split/);
+        assert.match(warning, /whole-floor cleaning works/);
+        assert.match(warning, /Roborock app/);
         assert.equal(warning.includes("lab_status"), false);
         assert.equal(warning.includes("unsave_map_flag"), false);
         assert.equal(warning.includes("often means"), false);
@@ -92,11 +91,14 @@ describe("maps and protocol selection", () => {
         assert.equal(segmentIdForName("Room 16", []), 16);
         assert.equal(segmentIdForName("16", [{ segmentId: 16, name: "Room 16" }]), 16);
         assert.equal(segmentIdForName("Hall", [{ segmentId: 17, name: "Hall" }]), 17);
-        assert.deepEqual(resolveCommand({ command: "map", mapFlag: 1 }), {
-            label: "map",
-            method: "load_multi_map",
-            params: [[1]]
-        });
+        const numeric = resolveCommand({ command: "map", mapFlag: 1 });
+        assert.equal(numeric.method, "load_multi_map");
+        assert.deepEqual(numeric.params, [1]);
+        assert.equal(typeof numeric.params[0], "number");
+        const fromString = resolveCommand({ command: "map", mapFlag: "2" });
+        assert.deepEqual(fromString.params, [2]);
+        assert.equal(typeof fromString.params[0], "number");
+        assert.equal(Array.isArray(fromString.params[0]), false);
         assert.equal(resolveCommand("maps").method, "get_multi_maps_list");
         assert.doesNotThrow(() => assertReadOnlyCommand(resolveCommand("get_status"), false));
         assert.doesNotThrow(() => assertReadOnlyCommand(resolveCommand("get_consumable"), false));

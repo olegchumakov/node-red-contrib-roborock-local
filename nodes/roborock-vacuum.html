@@ -33,7 +33,7 @@
         <li><code>{"command":"fan","speed":"turbo"}</code> — silent, balanced, turbo, max, gentle, auto, or a raw number. S7 custom modes are 101–106. Older firmware may want 38/60/77/90; pass the number.</li>
         <li><code>{"command":"mop","intensity":"high"}</code> — off, low, medium, high</li>
         <li><code>{"command":"rooms","segments":[16,17],"repeat":1}</code> or <code>{"command":"rooms","names":["Room 16"]}</code>. Unnamed rooms are segment ids. <code>names:["16"]</code> is the same as segment 16.</li>
-        <li><code>{"command":"maps"}</code> reads <code>get_multi_maps_list</code>. <code>{"command":"map","mapFlag":1}</code> sends <code>load_multi_map</code> and switches the robot to that floor.</li>
+        <li><code>{"command":"maps"}</code> reads <code>get_multi_maps_list</code>. <code>{"command":"map","mapFlag":1}</code> sends <code>load_multi_map</code> with params <code>[1]</code> (a number; a numeric string is coerced) and switches the robot to that floor. <code>get_room_mapping</code> returning <code>[]</code> means that floor has no room split; that is normal.</li>
         <li><code>{"command":"zone","zones":[[x1,y1,x2,y2,1]]}</code></li>
         <li><code>{"method":"get_consumable","params":[]}</code> sends that RPC method as-is</li>
     </ul>

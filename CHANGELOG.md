@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0
+
+- Cloud login (email code, password, and Home Assistant session import) is only on `roborock-account`. The device node no longer has those fields. One account can supply several vacuums.
+- Fetch devices works before deploy. Signing in stores the session in the account credentials on Done and in a 15-minute editor cache that is cleared on deploy. Setup is one Deploy: add the vacuum, sign in on the account, Done, pick the vacuum, Done, Deploy.
+- Selecting an account on a device that has no DUID yet fills the vacuum in when the account has one robot.
+- A cloud session left on a device node from 0.1.0 is ignored. Local control still uses the saved IP, DUID, local key, and `pv`, and logs a one-time hint.
+- `load_multi_map` is sent as `[mapFlag]` with a number. A nested array was rejected by the S7 (`First element in array is not an Number`).
+- Maps and rooms are an optional collapsed section. An empty `get_room_mapping` (`[]`) is treated as normal when the floor has no room split. The device config no longer asks for segment ids; pass them in `msg.payload` when you want room cleaning.
+
 ## 0.1.0
 
 - Local TCP control of Roborock vacuums on port 58867 (protocol 1.0, with an L01 handshake fallback).

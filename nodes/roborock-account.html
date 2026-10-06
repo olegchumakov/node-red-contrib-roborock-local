@@ -32,13 +32,13 @@
         <button type="button" class="red-ui-button" id="rr-account-pass-login">Log in with password</button>
     </div>
     <div class="form-row">
-        <label for="rr-account-import"><i class="fa fa-paste"></i> Existing session</label>
+        <label for="rr-account-import"><i class="fa fa-paste"></i> Home Assistant session</label>
         <textarea id="rr-account-import" rows="3" style="width:70%" placeholder="Paste Home Assistant user_data JSON" autocomplete="off"></textarea>
     </div>
     <div class="form-row">
-        <button type="button" class="red-ui-button" id="rr-account-import-btn">Import session</button>
+        <button type="button" class="red-ui-button" id="rr-account-import-btn">Import Home Assistant session</button>
     </div>
-    <div class="form-tips" id="rr-account-status">Sign in once, or paste an existing session, so a Roborock device node can download DUID and local_key. The session stays in Node-RED credentials, not in the flow file, and is not written to the log.</div>
+    <div class="form-tips" id="rr-account-status">Sign in here, or paste a Home Assistant session. Click Done, then fetch devices on the vacuum. You do not need to deploy in between. The session stays in credentials, not in the flow file, and is not written to the log.</div>
     <input type="password" id="node-config-input-userData" style="display:none" autocomplete="off">
     <input type="hidden" id="node-config-input-clientId">
 </script>
@@ -49,8 +49,8 @@
     <ol>
         <li>Enter the email address from the Roborock app. Pick Russia, Europe, US, or China if auto-detect fails. Russia is <code>https://ruiot.roborock.com</code>.</li>
         <li>Click <b>Send code</b>, then enter the code from the email. Password login is also available for older accounts.</li>
-        <li>Or paste <code>user_data</code> from Home Assistant (<code>.storage/core.config_entries</code>, the roborock entry) and click <b>Import session</b>. Include <code>base_url</code> by pasting the whole entry when you can. The JSON is validated and not logged.</li>
-        <li>Deploy. Then open a Roborock device node and click <b>Fetch devices</b>.</li>
+        <li>Or paste <code>user_data</code> from Home Assistant (<code>.storage/core.config_entries</code>, the roborock entry) and click <b>Import Home Assistant session</b>. Include <code>base_url</code> by pasting the whole entry when you can. The JSON is validated and not logged.</li>
+        <li>Click <b>Done</b>. Open the Roborock device node and click <b>Fetch devices from account</b>. Deploy once after the vacuum fields are filled. A deploy is not required between sign-in and the fetch.</li>
     </ol>
     <p>IP, DUID, <code>localKey</code>, and model live on the device node's credentials, not in this account node and not in the flow file.</p>
     <h3>When the key changes</h3>
@@ -92,6 +92,7 @@
             node._sessionUserData = null;
             function payload() {
                 return {
+                    nodeId: node.id,
                     email: $("#node-config-input-email").val(),
                     region: $("#node-config-input-region").val(),
                     baseUrl: $("#node-config-input-baseUrl").val(),
@@ -127,7 +128,7 @@
                 postJSON("roborock-local/login", Object.assign(payload(), { code: $("#rr-account-code").val() }))
                     .done(function (data) {
                         remember(data);
-                        setStatus((data.message || "Signed in.") + " Deploy, then fetch devices from a Roborock device node.");
+                        setStatus((data.message || "Signed in.") + " Click Done, then fetch devices on the vacuum. Deploy is not required yet.");
                     })
                     .fail(function (xhr) {
                         setStatus((xhr.responseJSON && xhr.responseJSON.error) || "Login failed", true);
@@ -140,7 +141,7 @@
                     .done(function (data) {
                         $("#rr-account-import").val("");
                         remember(data);
-                        setStatus((data.message || "Session imported.") + " Deploy, then fetch devices from a Roborock device node.");
+                        setStatus((data.message || "Session imported.") + " Click Done, then fetch devices on the vacuum. Deploy is not required yet.");
                     })
                     .fail(function (xhr) {
                         setStatus((xhr.responseJSON && xhr.responseJSON.error) || "Could not import that session", true);
@@ -152,7 +153,7 @@
                     .done(function (data) {
                         remember(data);
                         $("#rr-account-password").val("");
-                        setStatus((data.message || "Signed in.") + " Deploy, then fetch devices from a Roborock device node.");
+                        setStatus((data.message || "Signed in.") + " Click Done, then fetch devices on the vacuum. Deploy is not required yet.");
                     })
                     .fail(function (xhr) {
                         setStatus((xhr.responseJSON && xhr.responseJSON.error) || "Login failed", true);

@@ -2,6 +2,8 @@
 
 const { registerAdmin } = require("../lib/admin");
 
+const legacySessionHints = new Set();
+
 module.exports = function (RED) {
     registerAdmin(RED);
 
@@ -9,8 +11,6 @@ module.exports = function (RED) {
         RED.nodes.createNode(this, config);
         this.deviceName = config.deviceName || "";
         this.protocol = config.protocol || "auto";
-        this.region = config.region || "auto";
-        this.baseUrl = config.baseUrl || "";
         this.firmware = config.firmware || "";
         this.pv = config.pv || "";
         this.rooms = parseRooms(config.rooms);
@@ -26,6 +26,7 @@ module.exports = function (RED) {
         this.localKey = creds.localKey || "";
         this.model = creds.model || "";
         this.account = config.account;
+        hintLegacySession(this);
     }
 
     RED.nodes.registerType("roborock-device", RoborockDeviceNode, {
@@ -33,13 +34,24 @@ module.exports = function (RED) {
             ip: { type: "text" },
             duid: { type: "text" },
             localKey: { type: "password" },
-            model: { type: "text" },
-            email: { type: "text" },
-            clientId: { type: "text" },
-            userData: { type: "password" }
+            model: { type: "text" }
         }
     });
 };
+
+module.exports.resetLegacySessionHintsForTests = function () {
+    legacySessionHints.clear();
+};
+
+function hintLegacySession(node) {
+    const creds = node.credentials || {};
+    const leftover = Boolean(creds.userData || creds.email || creds.clientId);
+    if (!leftover || legacySessionHints.has(node.id)) {
+        return;
+    }
+    legacySessionHints.add(node.id);
+    node.warn("Cloud login saved on this device node is ignored. Local control still uses the IP, DUID, and local key stored here. Sign in on a roborock account node, select it, and use Fetch devices from account.");
+}
 
 function parseRooms(value) {
     if (Array.isArray(value)) {
