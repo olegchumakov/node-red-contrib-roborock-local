@@ -1,0 +1,471 @@
+<script type="text/html" data-template-name="roborock-device">
+    <div class="form-row">
+        <label for="node-config-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-config-input-name" placeholder="Downstairs S7">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-account"><i class="fa fa-user"></i> Account</label>
+        <input type="text" id="node-config-input-account">
+    </div>
+    <div class="form-row">
+        <button type="button" class="red-ui-button" id="rr-fetch-account">Fetch devices from account</button>
+    </div>
+    <div class="form-tips">Deploy the account after signing in, select it here, then fetch. Or sign in on this node instead.</div>
+
+    <hr>
+    <div class="form-row">
+        <label for="node-config-input-email"><i class="fa fa-envelope"></i> Email</label>
+        <input type="text" id="node-config-input-email" placeholder="you@example.com" autocomplete="off">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-region"><i class="fa fa-globe"></i> Region</label>
+        <select id="node-config-input-region" style="width:70%">
+            <option value="auto">Auto-detect from the email</option>
+            <option value="ru">Russia — ruiot.roborock.com</option>
+            <option value="eu">Europe — euiot.roborock.com</option>
+            <option value="us">United States — usiot.roborock.com</option>
+            <option value="cn">China — cniot.roborock.com</option>
+        </select>
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-baseUrl"><i class="fa fa-link"></i> Cloud URL</label>
+        <input type="text" id="node-config-input-baseUrl" placeholder="optional, https://ruiot.roborock.com">
+    </div>
+    <div class="form-row">
+        <button type="button" class="red-ui-button" id="rr-send-code">Send code</button>
+        <input type="text" id="rr-code" placeholder="email code" style="width:28%" autocomplete="off">
+        <button type="button" class="red-ui-button" id="rr-login-code">Log in with code</button>
+    </div>
+    <div class="form-row">
+        <input type="password" id="rr-password" placeholder="password (optional)" style="width:48%" autocomplete="new-password">
+        <button type="button" class="red-ui-button" id="rr-login-pass">Log in with password</button>
+    </div>
+    <div class="form-row">
+        <label for="rr-import-session"><i class="fa fa-paste"></i> Existing session</label>
+        <textarea id="rr-import-session" rows="3" style="width:70%" placeholder="Paste Home Assistant user_data JSON" autocomplete="off"></textarea>
+    </div>
+    <div class="form-row">
+        <button type="button" class="red-ui-button" id="rr-import">Import session</button>
+    </div>
+    <div class="form-tips">Optional. Home Assistant stores this under <code>.storage/core.config_entries</code> on the roborock entry (<code>data.user_data</code>, or the whole entry so <code>base_url</code> is included). It is checked, then kept in credentials. It is not written to the flow or the Node-RED log.</div>
+    <div id="rr-device-list" style="margin:8px 0;"></div>
+    <div class="form-tips" id="rr-device-status">The local key is stored in credentials and is not written into the exported flow.</div>
+
+    <hr>
+    <div class="form-row">
+        <label for="node-config-input-deviceName"><i class="fa fa-android"></i> Vacuum</label>
+        <input type="text" id="node-config-input-deviceName" placeholder="name from the app">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-ip"><i class="fa fa-desktop"></i> IP</label>
+        <input type="text" id="node-config-input-ip" placeholder="192.168.1.20" autocomplete="off">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-duid"><i class="fa fa-barcode"></i> DUID</label>
+        <input type="text" id="node-config-input-duid" autocomplete="off">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-localKey"><i class="fa fa-key"></i> Local key</label>
+        <input type="password" id="node-config-input-localKey" autocomplete="new-password">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-model"><i class="fa fa-info-circle"></i> Model</label>
+        <input type="text" id="node-config-input-model" placeholder="roborock.vacuum.a15">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-protocol"><i class="fa fa-exchange"></i> Protocol</label>
+        <select id="node-config-input-protocol" style="width:70%">
+            <option value="auto">Auto (saved protocol, else 1.0 then L01)</option>
+            <option value="1.0">1.0 — S7 and most robots</option>
+            <option value="L01">L01</option>
+        </select>
+    </div>
+    <div class="form-row">
+        <button type="button" class="red-ui-button" id="rr-discover">Find on LAN</button>
+        <button type="button" class="red-ui-button" id="rr-map-rooms">Read maps</button>
+    </div>
+    <div id="rr-map-list" style="margin:8px 0;"></div>
+    <div id="rr-segment-list" style="margin:4px 0;"></div>
+    <div class="form-row">
+        <label for="rr-manual-segments"><i class="fa fa-th"></i> Segment ids</label>
+        <textarea id="rr-manual-segments" rows="4" style="width:70%" placeholder="16&#10;17" autocomplete="off"></textarea>
+    </div>
+    <div class="form-row">
+        <button type="button" class="red-ui-button" id="rr-save-segments">Use these segment ids</button>
+    </div>
+    <div class="form-tips">The cloud response usually has no IP. Discovery listens for a few seconds on UDP 58866. If Home Assistant's Roborock integration is already bound to that port on this machine, type the IP. IP, DUID, local key, and model are credentials, not flow properties. Read maps loads <code>get_multi_maps_list</code> and the segments for the map that is active. Load switches the robot to that floor. Unnamed rooms are stored as Room 16. Cloud names such as old home-data labels are not used as segment names.</div>
+    <input type="hidden" id="node-config-input-firmware">
+    <input type="hidden" id="node-config-input-pv">
+    <input type="hidden" id="node-config-input-rooms">
+    <input type="password" id="node-config-input-userData" style="display:none" autocomplete="off">
+    <input type="hidden" id="node-config-input-clientId">
+</script>
+
+<script type="text/html" data-help-name="roborock-device">
+    <p>Connection settings for one Roborock vacuum on the local network. <code>local_key</code>, DUID, model, and IP are stored as Node-RED credentials and are omitted from flow exports.</p>
+    <h3>Get the key from your account</h3>
+    <ol>
+        <li>Optional: create a <b>roborock account</b> config, sign in, deploy, and select it here.</li>
+        <li>Or enter the app email on this node, send a code, and log in. Choose the region if auto-detect is wrong (Russia uses <code>ruiot.roborock.com</code>).</li>
+        <li>Pick the vacuum in the list. Click <b>Find on LAN</b> if the IP is empty.</li>
+        <li>Deploy. The vacuum node can then run without the cloud.</li>
+    </ol>
+    <h3>Credentials, not config</h3>
+    <p><code>ip</code>, <code>duid</code>, <code>localKey</code>, and <code>model</code> are Node-RED credentials. They are not properties of the node config, and they are omitted from an exported flow. In the editor, type them in those fields and deploy.</p>
+    <p>The Admin API <code>POST /flows</code> with the default <code>Node-RED-API-Version: v1</code> takes a <b>raw array</b>. Put the secrets on that node's <code>credentials</code> object. Node-RED copies them into the credential store and does not keep them in <code>flows.json</code>:</p>
+    <pre>[
+  {
+    "id": "device1",
+    "type": "roborock-device",
+    "name": "S7",
+    "protocol": "auto",
+    "pv": "1.0",
+    "rooms": "[]",
+    "credentials": {
+      "ip": "192.168.1.20",
+      "duid": "YOUR_DUID",
+      "localKey": "YOUR_LOCAL_KEY",
+      "model": "roborock.vacuum.a15"
+    }
+  }
+]</pre>
+    <h3>Home Assistant session</h3>
+    <p>Paste <code>user_data</code> from <code>.storage/core.config_entries</code> (the roborock entry's <code>data.user_data</code>, or the whole entry so <code>base_url</code> comes along) and click <b>Import session</b>. That skips the email code. The JSON is validated and then stored as the <code>userData</code> credential. It is not logged.</p>
+    <h3>Manual entry</h3>
+    <p>Paste IP, DUID, and local_key if you already have them (for example from <code>roborock-cloud-login</code>).</p>
+    <h3>Refreshing a key</h3>
+    <p>Re-pairing or a Wi-Fi reset rotates <code>local_key</code>. Fetch the device again and deploy. Timeouts and "decrypt failed" point at a stale key or a wrong IP, not at the cloud.</p>
+    <h3>Maps and numbered rooms</h3>
+    <p><b>Read maps</b> asks for <code>get_multi_maps_list</code> and <code>get_room_mapping</code> for the map that is loaded. Map names (for example floors) come from the robot. Segments are shown as <b>Room 16</b>. <b>Load</b> sends <code>load_multi_map</code> and switches the robot to that floor, then reads segments again. If the robot returns no segments, the editor says so for the current map and you can type ids (one per line, optional label: <code>16</code> or <code>16 Hall</code>). Cloud home room names are not used. Clean with <code>{"command":"rooms","segments":[16]}</code> or <code>{"command":"rooms","names":["Room 16"]}</code>.</p>
+    <p>Auto protocol uses the account <code>pv</code> when it is <code>1.0</code> and does not wait for an L01 hello. Choosing L01 still tries L01 and reports <code>No CONNACK for L01</code> if the firmware does not speak it.</p>
+</script>
+
+<script type="text/javascript">
+(function () {
+    function postJSON(url, body) {
+        return $.ajax({
+            url: url,
+            type: "POST",
+            contentType: "application/json; charset=UTF-8",
+            data: JSON.stringify(body),
+            dataType: "json"
+        });
+    }
+    function escapeHtml(value) {
+        return String(value == null ? "" : value)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+    }
+    function setStatus(text, isError) {
+        $("#rr-device-status").text(text).css("color", isError ? "#a00" : "");
+    }
+    RED.nodes.registerType("roborock-device", {
+        category: "config",
+        defaults: {
+            name: { value: "" },
+            account: { value: "", type: "roborock-account" },
+            deviceName: { value: "" },
+            protocol: { value: "auto" },
+            region: { value: "auto" },
+            baseUrl: { value: "" },
+            firmware: { value: "" },
+            pv: { value: "" },
+            rooms: { value: "[]" }
+        },
+        credentials: {
+            ip: { type: "text" },
+            duid: { type: "text" },
+            localKey: { type: "password" },
+            model: { type: "text" },
+            email: { type: "text" },
+            clientId: { type: "text" },
+            userData: { type: "password" }
+        },
+        label: function () {
+            return this.name || this.deviceName || "roborock device";
+        },
+        oneditprepare: function () {
+            const node = this;
+            node._sessionUserData = null;
+            node._segments = [];
+            node._currentMapFlag = null;
+            try {
+                const parsed = JSON.parse($("#node-config-input-rooms").val() || "[]");
+                if (Array.isArray(parsed)) {
+                    node._segments = parsed;
+                }
+            } catch (err) {
+                node._segments = [];
+            }
+            $("#rr-manual-segments").val(node._segments.map(function (room) {
+                const name = room.name && room.name !== ("Room " + room.segmentId) ? " " + room.name : "";
+                return String(room.segmentId) + name;
+            }).join("\n"));
+            renderSegments(node._segments);
+            function loginPayload() {
+                return {
+                    email: $("#node-config-input-email").val(),
+                    region: $("#node-config-input-region").val(),
+                    baseUrl: $("#node-config-input-baseUrl").val(),
+                    clientId: $("#node-config-input-clientId").val()
+                };
+            }
+            function rememberSession(data) {
+                if (data.clientId) {
+                    $("#node-config-input-clientId").val(data.clientId);
+                }
+                if (data.baseUrl) {
+                    $("#node-config-input-baseUrl").val(data.baseUrl);
+                }
+                if (data.userData) {
+                    node._sessionUserData = data.userData;
+                    $("#node-config-input-userData").val(JSON.stringify(data.userData));
+                }
+                if (data.email && !$("#node-config-input-email").val()) {
+                    $("#node-config-input-email").val(data.email);
+                }
+            }
+            function parseManualSegments(text) {
+                return String(text || "").split(/\n/).map(function (line) {
+                    const trimmed = line.trim();
+                    const match = trimmed.match(/^(\d+)\s*(.*)$/);
+                    if (!match) {
+                        return null;
+                    }
+                    const segmentId = Number(match[1]);
+                    const custom = match[2].trim();
+                    const segment = {
+                        segmentId: segmentId,
+                        name: custom || ("Room " + segmentId)
+                    };
+                    if (node._currentMapFlag !== null && node._currentMapFlag !== undefined) {
+                        segment.mapFlag = node._currentMapFlag;
+                    }
+                    return segment;
+                }).filter(Boolean);
+            }
+            function renderSegments(segments) {
+                const host = $("#rr-segment-list").empty();
+                (segments || []).forEach(function (segment) {
+                    host.append($("<div class='form-tips'></div>").text(segment.name + " · segment " + segment.segmentId));
+                });
+            }
+            function storeSegments(segments) {
+                node._segments = segments || [];
+                $("#node-config-input-rooms").val(JSON.stringify(node._segments));
+                renderSegments(node._segments);
+            }
+            function renderMaps(data) {
+                const host = $("#rr-map-list").empty();
+                (data.maps || []).forEach(function (map) {
+                    const row = $("<div style='margin:4px 0'></div>");
+                    const label = (map.current ? "Current: " : "") + (map.name || ("Map " + map.mapFlag));
+                    row.append($("<span></span>").text(label + " "));
+                    if (!map.current) {
+                        const button = $("<button type='button' class='red-ui-button'>Load</button>");
+                        button.on("click", function () {
+                            readMaps("load", map.mapFlag);
+                        });
+                        row.append(button);
+                    }
+                    host.append(row);
+                });
+            }
+            function applyMapResult(data) {
+                node._currentMapFlag = data.currentMapFlag === undefined ? null : data.currentMapFlag;
+                renderMaps(data);
+                if (data.segments && data.segments.length) {
+                    const merged = data.segments.map(function (segment) {
+                        const prev = (node._segments || []).find(function (item) {
+                            return Number(item.segmentId) === Number(segment.segmentId);
+                        });
+                        if (prev && prev.name && prev.name !== ("Room " + prev.segmentId)) {
+                            return Object.assign({}, segment, { name: prev.name });
+                        }
+                        return segment;
+                    });
+                    storeSegments(merged);
+                    $("#rr-manual-segments").val(merged.map(function (segment) {
+                        const custom = segment.name !== ("Room " + segment.segmentId) ? " " + segment.name : "";
+                        return String(segment.segmentId) + custom;
+                    }).join("\n"));
+                }
+                if (data.warning) {
+                    setStatus(data.warning, true);
+                } else {
+                    setStatus(data.message || "Maps read.");
+                }
+            }
+            function readMaps(action, mapFlag) {
+                const key = $("#node-config-input-localKey").val();
+                const body = {
+                    ip: $("#node-config-input-ip").val(),
+                    duid: $("#node-config-input-duid").val(),
+                    protocol: $("#node-config-input-protocol").val(),
+                    pv: $("#node-config-input-pv").val(),
+                    nodeId: node.id,
+                    action: action || "read"
+                };
+                if (mapFlag !== undefined && mapFlag !== null) {
+                    body.mapFlag = mapFlag;
+                }
+                if (key && key !== "__PWRD__") {
+                    body.localKey = key;
+                }
+                setStatus(action === "load" ? "Switching the robot to that map, then reading segments..." : "Reading maps and segments...");
+                postJSON("roborock-local/map-rooms", body).done(applyMapResult).fail(function (xhr) {
+                    setStatus((xhr.responseJSON && xhr.responseJSON.error) || "Could not read maps", true);
+                });
+            }
+            function renderDevices(devices) {
+                const host = $("#rr-device-list").empty();
+                if (!devices || !devices.length) {
+                    host.text("No vacuums returned.");
+                    return;
+                }
+                devices.forEach(function (device) {
+                    const label = [
+                        device.name || "Vacuum",
+                        device.model || "",
+                        device.firmware ? "fw " + device.firmware : "",
+                        device.ip || "IP unknown",
+                        device.online === false ? "offline in cloud" : ""
+                    ].filter(Boolean).join(" · ");
+                    const button = $("<button type='button' class='red-ui-button' style='display:block;margin:4px 0;text-align:left;'></button>");
+                    button.text(label);
+                    button.on("click", function () {
+                        $("#node-config-input-duid").val(device.duid || "");
+                        $("#node-config-input-localKey").val(device.localKey || "");
+                        $("#node-config-input-model").val(device.model || "");
+                        $("#node-config-input-deviceName").val(device.name || "");
+                        $("#node-config-input-firmware").val(device.firmware || "");
+                        if (device.pv) {
+                            $("#node-config-input-pv").val(device.pv);
+                        }
+                        if (device.ip) {
+                            $("#node-config-input-ip").val(device.ip);
+                        }
+                        if (!$("#node-config-input-name").val()) {
+                            $("#node-config-input-name").val(device.name || "");
+                        }
+                        const protocolNote = device.pv === "1.0" ? " Protocol 1.0 from the account; auto will not try L01." : "";
+                        setStatus("Selected " + (device.name || device.duid) + ". Deploy to save the key" + (device.ip ? "." : ", then set the IP or use Find on LAN.") + protocolNote);
+                    });
+                    host.append(button);
+                });
+            }
+            function showDevices(data) {
+                rememberSession(data);
+                renderDevices(data.devices || []);
+                const extra = data.discoveryError ? " LAN discovery: " + data.discoveryError : "";
+                setStatus((data.message || ("Found " + ((data.devices || []).length) + " device(s).")) + extra);
+            }
+            $("#rr-send-code").on("click", function () {
+                setStatus("Requesting a verification code...");
+                postJSON("roborock-local/send-code", loginPayload()).done(function (data) {
+                    rememberSession(data);
+                    setStatus(data.message || "Code sent.");
+                }).fail(function (xhr) {
+                    setStatus((xhr.responseJSON && xhr.responseJSON.error) || "Could not send the code", true);
+                });
+            });
+            $("#rr-login-code").on("click", function () {
+                setStatus("Signing in...");
+                postJSON("roborock-local/login", Object.assign(loginPayload(), { code: $("#rr-code").val() }))
+                    .done(showDevices)
+                    .fail(function (xhr) {
+                        setStatus((xhr.responseJSON && xhr.responseJSON.error) || "Login failed", true);
+                    });
+            });
+            $("#rr-login-pass").on("click", function () {
+                setStatus("Signing in with password...");
+                postJSON("roborock-local/login", Object.assign(loginPayload(), { password: $("#rr-password").val() }))
+                    .done(function (data) {
+                        $("#rr-password").val("");
+                        showDevices(data);
+                    })
+                    .fail(function (xhr) {
+                        setStatus((xhr.responseJSON && xhr.responseJSON.error) || "Login failed", true);
+                    });
+            });
+            $("#rr-fetch-account").on("click", function () {
+                const accountId = $("#node-config-input-account").val();
+                const userData = $("#node-config-input-userData").val();
+                const body = { discover: true };
+                if (userData && userData !== "__PWRD__") {
+                    Object.assign(body, loginPayload(), { userData: userData });
+                } else if (accountId) {
+                    body.nodeId = accountId;
+                } else {
+                    body.nodeId = node.id;
+                }
+                setStatus("Loading devices...");
+                postJSON("roborock-local/devices", body).done(showDevices).fail(function (xhr) {
+                    setStatus((xhr.responseJSON && xhr.responseJSON.error) || "Could not load devices", true);
+                });
+            });
+            $("#rr-import").on("click", function () {
+                const pasted = $("#rr-import-session").val();
+                setStatus("Checking the imported session...");
+                postJSON("roborock-local/import-session", Object.assign(loginPayload(), { userData: pasted }))
+                    .done(function (data) {
+                        $("#rr-import-session").val("");
+                        showDevices(data);
+                    })
+                    .fail(function (xhr) {
+                        setStatus((xhr.responseJSON && xhr.responseJSON.error) || "Could not import that session", true);
+                    });
+            });
+            $("#rr-discover").on("click", function () {
+                setStatus("Listening for vacuum announcements on UDP 58866...");
+                postJSON("roborock-local/discover", { timeoutMs: 8000 }).done(function (data) {
+                    const list = data.devices || [];
+                    if (!list.length) {
+                        setStatus("No announcements heard. The robot broadcasts occasionally; try again, or type the IP. UDP 58866 must reach this machine.", true);
+                        return;
+                    }
+                    const duid = $("#node-config-input-duid").val();
+                    const match = duid ? list.find(function (item) { return item.duid === duid; }) : null;
+                    if (match) {
+                        $("#node-config-input-ip").val(match.ip);
+                        setStatus("Found " + match.duid + " at " + match.ip + ".");
+                        return;
+                    }
+                    const lines = list.map(function (item) {
+                        return escapeHtml(item.duid) + " · " + escapeHtml(item.ip) + " · " + escapeHtml(item.version);
+                    }).join("<br>");
+                    $("#rr-device-list").html("<div class='form-tips'>Heard on the LAN:<br>" + lines + "</div>");
+                    if (list.length === 1 && !$("#node-config-input-ip").val()) {
+                        $("#node-config-input-ip").val(list[0].ip);
+                        if (!$("#node-config-input-duid").val()) {
+                            $("#node-config-input-duid").val(list[0].duid);
+                        }
+                    }
+                    setStatus("Heard " + list.length + " announcement(s).");
+                }).fail(function (xhr) {
+                    setStatus((xhr.responseJSON && xhr.responseJSON.error) || "Discovery failed", true);
+                });
+            });
+            $("#rr-map-rooms").on("click", function () {
+                readMaps("read");
+            });
+            $("#rr-save-segments").on("click", function () {
+                const segments = parseManualSegments($("#rr-manual-segments").val());
+                if (!segments.length) {
+                    setStatus("Enter one segment id per line, for example 16.", true);
+                    return;
+                }
+                storeSegments(segments);
+                setStatus("Stored " + segments.map(function (segment) { return segment.name; }).join(", ") + ". Deploy to keep them.");
+            });
+        },
+        oneditsave: function () {
+            if (this._sessionUserData) {
+                $("#node-config-input-userData").val(JSON.stringify(this._sessionUserData));
+            }
+        }
+    });
+})();
+</script>
