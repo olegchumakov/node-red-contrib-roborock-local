@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1
+
+- The device editor no longer stores a map or switches floors. **Show maps & rooms** is a read-only list (map name, `mapFlag`, room ids). Saved `rooms` and other map fields from 0.1.x / 0.2.0 are ignored and do not have to be removed.
+- `get_room_mapping` is only the loaded map (`[segmentId, cloudRoomId, tag]`; the third value is a room tag, not a map id). Other floors show room ids when `get_multi_maps_list` includes a `rooms` array. Otherwise the list says `rooms visible when this map is loaded`. The editor does not call `load_multi_map`.
+- Room names are shown only when `get_room_mapping` links a segment to a cloud home room id (account session cache or saved account credentials), or when that map entry included `iot_name`. Unlinked home-room names are not shown.
+- Vacuum commands, unchanged where they already existed: `{"command":"map","mapFlag":1}` loads a floor (`[mapFlag]`, number). `{"command":"rooms","segments":[16]}` cleans those ids on the loaded map. `{"command":"rooms","names":["Kitchen"]}` works when the name matches one segment. New read command `{"command":"map_rooms"}` (alias `maps_rooms`) puts the maps-and-rooms list on `msg.payload`. `{"command":"maps"}` is still the raw `get_multi_maps_list` result.
+
 ## 0.2.0
 
 - Cloud login (email code, password, and Home Assistant session import) is only on `roborock-account`. The device node no longer has those fields. One account can supply several vacuums.

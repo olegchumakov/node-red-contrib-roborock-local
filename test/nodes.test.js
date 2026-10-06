@@ -8,7 +8,7 @@ const path = require("path");
 const helper = require("node-red-node-test-helper");
 const { startMock } = require("./mock-vacuum");
 const { resetForTests } = require("../lib/session");
-const { setDevicesLoaderForTests, clearEditorSessions } = require("../lib/admin");
+const { setDevicesLoaderForTests, setHomeLoaderForTests, clearEditorSessions } = require("../lib/admin");
 const { rememberEditorSession, readEditorSession } = require("../lib/editor-sessions");
 const deviceModule = require("../nodes/roborock-device.js");
 
@@ -42,6 +42,7 @@ describe("node-red nodes", () => {
         resetForTests();
         deviceModule.resetLegacySessionHintsForTests();
         setDevicesLoaderForTests(null);
+        setHomeLoaderForTests(null);
         clearEditorSessions();
     });
 
@@ -175,20 +176,20 @@ describe("node-red nodes", () => {
             assert.equal(response.body.maps[1].name, "1 этаж");
             assert.equal(response.body.currentMapFlag, 2);
             assert.equal(response.body.maps[1].current, true);
-            assert.deepEqual(response.body.segments, []);
+            assert.deepEqual(response.body.maps[1].segments, []);
+            assert.match(response.body.maps[1].note, /could not be read/i);
+            assert.equal(response.body.maps[0].note, "rooms visible when this map is loaded");
             assert.match(response.body.mappingError, /mapping unavailable/);
-            assert.match(response.body.warning, /Could not read segments/);
-            assert.match(response.body.warning, /1 этаж/);
-            assert.match(response.body.warning, /not used/);
-            assert.equal(response.body.warning.includes("lab_status"), false);
-            assert.equal(response.body.warning.includes("often means"), false);
+            assert.equal(JSON.stringify(response.body).includes("lab_status"), false);
+            assert.equal(JSON.stringify(response.body).includes("often means"), false);
             assert.equal(JSON.stringify(response.body).includes("testlocalkey1234"), false);
+            assert.equal(mock.requests.some((rpc) => rpc.method === "load_multi_map"), false);
         } finally {
             await mock.close();
         }
     });
 
-    test("load map sends a numeric mapFlag, not a nested array", async () => {
+    test("the editor refuses to load a map", async () => {
         const mock = await startMock((rpc) => {
             if (rpc.method === "get_status") {
                 return [{ state: 8, battery: 100, error_code: 0, map_status: 11 }];
@@ -239,14 +240,9 @@ describe("node-red nodes", () => {
                     action: "load",
                     mapFlag: "1"
                 });
-            assert.equal(response.status, 200);
-            assert.equal(response.body.ok, true);
-            const loadCall = mock.requests.find((rpc) => rpc.method === "load_multi_map");
-            assert.ok(loadCall);
-            assert.deepEqual(loadCall.params, [1]);
-            assert.equal(typeof loadCall.params[0], "number");
-            assert.equal(Array.isArray(loadCall.params[0]), false);
-            assert.match(response.body.warning, /no rooms split/);
+            assert.equal(response.status, 400);
+            assert.match(response.body.error, /vacuum command/);
+            assert.equal(mock.requests.some((rpc) => rpc.method === "load_multi_map"), false);
         } finally {
             await mock.close();
         }
@@ -374,14 +370,22 @@ describe("node-red nodes", () => {
         assert.equal(readEditorSession("account-unsaved"), null);
     });
 
-    test("the device editor has no login form and maps are optional", () => {
+    test("the device editor has no login form and does not store or load maps", () => {
         const deviceHtml = fs.readFileSync(path.join(__dirname, "../nodes/roborock-device.html"), "utf8");
+        const vacuumHtml = fs.readFileSync(path.join(__dirname, "../nodes/roborock-vacuum.html"), "utf8");
         const accountHtml = fs.readFileSync(path.join(__dirname, "../nodes/roborock-account.html"), "utf8");
         assert.equal(deviceHtml.includes("rr-manual-segments"), false);
         assert.equal(deviceHtml.includes("rr-send-code"), false);
         assert.equal(deviceHtml.includes("RED.notify"), false);
-        assert.match(deviceHtml, /Maps &amp; rooms \(optional\)/);
-        assert.match(deviceHtml, /no rooms split/);
+        assert.equal(deviceHtml.includes("node-config-input-rooms"), false);
+        assert.equal(deviceHtml.includes(">Load<"), false);
+        assert.equal(deviceHtml.includes("action: \"load\""), false);
+        assert.equal(deviceHtml.includes("readMaps"), false);
+        assert.match(deviceHtml, /Show maps &amp; rooms/);
+        assert.match(deviceHtml, /rooms visible when this map is loaded/);
+        assert.match(deviceHtml, /\{"command":"map_rooms"\}/);
+        assert.match(vacuumHtml, /\{"command":"map","mapFlag":1\}/);
+        assert.match(vacuumHtml, /\{"command":"rooms","segments":\[16,17\],"repeat":1\}/);
         const creds = deviceHtml.slice(deviceHtml.lastIndexOf("credentials:"), deviceHtml.indexOf("label:"));
         assert.equal(creds.includes("userData"), false);
         assert.equal(creds.includes("email"), false);
@@ -389,6 +393,175 @@ describe("node-red nodes", () => {
         assert.match(accountHtml, /Import Home Assistant session/);
         assert.match(accountHtml, /rr-account-pass-login/);
     });
+
+    test("stale map fields on a device config do not stop the vacuum", async () => {
+        const mock = await startMock();
+        try {
+            await helper.load(register, [
+                {
+                    id: "dev1",
+                    type: "roborock-device",
+                    name: "S7",
+                    protocol: "1.0",
+                    pv: "1.0",
+                    rooms: "[{\"segmentId\":16,\"name\":\"Kitchen\"}]",
+                    maps: [{ mapFlag: 1, name: "2 этаж" }],
+                    mapFlag: 1,
+                    port: mock.port,
+                    pingIntervalMs: 0,
+                    helloTimeoutMs: 1000,
+                    requestTimeoutMs: 1000
+                },
+                { id: "n1", type: "roborock-vacuum", name: "vacuum", device: "dev1", pollInterval: 0, statusOnChange: true, wires: [["h1"], ["h2"]] },
+                { id: "h1", type: "helper" },
+                { id: "h2", type: "helper" }
+            ], {
+                dev1: {
+                    ip: "127.0.0.1",
+                    duid: "DUID1",
+                    localKey: "testlocalkey1234",
+                    model: "roborock.vacuum.a15"
+                }
+            });
+            const device = helper.getNode("dev1");
+            assert.equal(device.rooms, undefined);
+            const n1 = helper.getNode("n1");
+            const h1 = helper.getNode("h1");
+            const result = new Promise((resolve, reject) => {
+                const timer = setTimeout(() => reject(new Error("no command result")), 8000);
+                h1.on("input", (msg) => {
+                    clearTimeout(timer);
+                    resolve(msg);
+                });
+            });
+            n1.receive({ payload: "status" });
+            const msg = await result;
+            assert.equal(msg.method, "get_status");
+        } finally {
+            await mock.close();
+        }
+    });
+
+    test("map_rooms lists every floor and names only linked rooms; map load and room clean stay commands", async () => {
+        const mock = await startMock((rpc) => {
+            if (rpc.method === "get_status") {
+                return [{ state: 8, battery: 90, error_code: 0, map_status: 7 }];
+            }
+            if (rpc.method === "get_multi_maps_list") {
+                return [{
+                    map_info: [
+                        { mapFlag: 1, name: "2 этаж" },
+                        {
+                            mapFlag: 2,
+                            name: "1 этаж",
+                            rooms: [
+                                { id: 16, iot_name_id: "1", iot_name: "Спальня" },
+                                { id: 17, iot_name_id: "2", iot_name: "Кухня" },
+                                { id: 18, iot_name: "Коридор" },
+                                { id: 19 }
+                            ]
+                        }
+                    ]
+                }];
+            }
+            if (rpc.method === "get_room_mapping") {
+                return [[20, "99", 12]];
+            }
+            return ["ok"];
+        });
+        try {
+            setHomeLoaderForTests(async (accountId) => {
+                assert.equal(accountId, "acc1");
+                return {
+                    rooms: [
+                        { id: 1, name: "Главная спальня" },
+                        { id: 2, name: "Гостиная" },
+                        { id: 99, name: "Kitchen" }
+                    ]
+                };
+            });
+            await helper.load(register, [
+                { id: "acc1", type: "roborock-account", name: "account" },
+                {
+                    id: "dev1",
+                    type: "roborock-device",
+                    name: "S7",
+                    account: "acc1",
+                    protocol: "1.0",
+                    pv: "1.0",
+                    rooms: "[{\"segmentId\":3,\"name\":\"Kitchen\"}]",
+                    port: mock.port,
+                    pingIntervalMs: 0,
+                    helloTimeoutMs: 1000,
+                    requestTimeoutMs: 1000
+                },
+                { id: "n1", type: "roborock-vacuum", name: "vacuum", device: "dev1", pollInterval: 0, statusOnChange: true, wires: [["h1"], ["h2"]] },
+                { id: "h1", type: "helper" },
+                { id: "h2", type: "helper" }
+            ], {
+                dev1: {
+                    ip: "127.0.0.1",
+                    duid: "DUID1",
+                    localKey: "testlocalkey1234",
+                    model: "roborock.vacuum.a15"
+                }
+            });
+            const n1 = helper.getNode("n1");
+            const h1 = helper.getNode("h1");
+            const listed = await once(h1, () => n1.receive({ payload: { command: "map_rooms" } }));
+            assert.equal(listed.command, "map_rooms");
+            assert.equal(listed.payload.currentMapFlag, 1);
+            assert.equal(listed.payload.maps[0].name, "2 этаж");
+            assert.equal(listed.payload.maps[0].current, true);
+            assert.deepEqual(listed.payload.maps[0].segments, [{ segmentId: 20, name: "Kitchen" }]);
+            assert.equal(listed.payload.maps[1].note, undefined);
+            assert.deepEqual(listed.payload.maps[1].segments.map((segment) => segment.segmentId), [16, 17, 18, 19]);
+            assert.equal(listed.payload.maps[1].segments[0].name, "Спальня");
+            assert.equal(JSON.stringify(listed.payload).includes("Главная спальня"), false);
+            assert.equal(JSON.stringify(listed.payload).includes("Гостиная"), false);
+            assert.equal(mock.requests.some((rpc) => rpc.method === "load_multi_map"), false);
+
+            const cleaned = await once(h1, () => n1.receive({ payload: { command: "rooms", names: ["Kitchen"] } }));
+            assert.equal(cleaned.method, "app_segment_clean");
+            assert.deepEqual(cleaned.payload, ["ok"]);
+            const cleanCall = mock.requests.filter((rpc) => rpc.method === "app_segment_clean").pop();
+            assert.deepEqual(cleanCall.params, [{ segments: [20], repeat: 1 }]);
+
+            const byId = await once(h1, () => n1.receive({ payload: { command: "rooms", segments: [16, 17], repeat: 2 } }));
+            assert.equal(byId.method, "app_segment_clean");
+            const idCall = mock.requests.filter((rpc) => rpc.method === "app_segment_clean").pop();
+            assert.deepEqual(idCall.params, [{ segments: [16, 17], repeat: 2 }]);
+
+            const switched = await once(h1, () => n1.receive({ payload: { command: "map", mapFlag: "2" } }));
+            assert.equal(switched.method, "load_multi_map");
+            const loadCall = mock.requests.filter((rpc) => rpc.method === "load_multi_map").pop();
+            assert.deepEqual(loadCall.params, [2]);
+            assert.equal(typeof loadCall.params[0], "number");
+
+            const shown = await helper.request()
+                .post("/roborock-local/map-rooms")
+                .send({ nodeId: "dev1", accountId: "acc1", protocol: "1.0", pv: "1.0" });
+            assert.equal(shown.status, 200);
+            assert.equal(shown.body.ok, true);
+            assert.equal(shown.body.maps[1].segments.length, 4);
+            assert.equal(JSON.stringify(shown.body).includes("Главная спальня"), false);
+            assert.equal(mock.requests.filter((rpc) => rpc.method === "load_multi_map").length, 1);
+        } finally {
+            await mock.close();
+        }
+    });
+
+function once(node, fire) {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("no message")), 8000);
+        node.removeAllListeners("input");
+        node.on("input", (msg) => {
+            clearTimeout(timer);
+            resolve(msg);
+        });
+        fire();
+    });
+}
 
     test("admin send-code rejects a missing email", async () => {
         await helper.load(register, []);

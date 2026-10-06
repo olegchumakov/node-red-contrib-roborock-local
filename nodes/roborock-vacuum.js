@@ -1,8 +1,10 @@
 "use strict";
 
 const sessionPool = require("../lib/session");
-const { resolveCommand, segmentIdForName } = require("../lib/commands");
+const { resolveCommand, isMapRoomsCommand } = require("../lib/commands");
 const { statusColor, statusText, sameStatus, normalizeStatus } = require("../lib/status");
+const { readMapCatalog, resolveRoomTargets, isPlainSegmentLabel } = require("../lib/maps");
+const { loadCloudRooms } = require("../lib/admin");
 
 module.exports = function (RED) {
     function RoborockVacuumNode(config) {
@@ -64,27 +66,27 @@ module.exports = function (RED) {
                 complete(new Error("Roborock device is missing an IP or local key"));
                 return;
             }
-            let spec;
-            try {
-                const payload = withNamedRooms(msg.payload, device);
-                spec = resolveCommand(payload, node.command);
-            } catch (err) {
-                node.status({ fill: "red", shape: "ring", text: trimStatus(err.message) });
-                complete(err);
-                return;
-            }
-            node.session.client.request(spec.method, spec.params).then((result) => {
+            const incoming = msg.payload === undefined || msg.payload === null || msg.payload === ""
+                ? node.command
+                : msg.payload;
+            Promise.resolve().then(async () => {
+                if (isMapRoomsCommand(incoming)) {
+                    return readMapRooms(node, device, RED);
+                }
+                const spec = await resolveVacuumCommand(incoming, node, device, RED);
+                const result = await node.session.client.request(spec.method, spec.params);
                 const status = spec.method === "get_status" ? normalizeStatus(result) : node.session.client.lastStatus;
                 if (status) {
                     publishStatus(node, device, status, true);
                 }
-                const out = {
+                return {
                     payload: result,
                     command: spec.label,
                     method: spec.method,
                     status: status || null,
                     device: deviceSummary(device)
                 };
+            }).then((out) => {
                 send([out, null]);
                 complete();
             }).catch((err) => {
@@ -127,14 +129,61 @@ function publishStatus(node, device, status, fromCommand) {
     }
 }
 
-function withNamedRooms(payload, device) {
-    if (!payload || typeof payload !== "object" || Array.isArray(payload) || !Array.isArray(payload.names)) {
+async function readMapRooms(node, device, RED) {
+    const cloudRooms = await loadCloudRooms(RED, device && device.account);
+    const { catalog, status } = await readMapCatalog(
+        (method, params) => node.session.client.request(method, params),
+        cloudRooms
+    );
+    if (status) {
+        publishStatus(node, device, status, true);
+    }
+    return {
+        payload: catalog,
+        command: "map_rooms",
+        method: "map_rooms",
+        status: status || null,
+        device: deviceSummary(device)
+    };
+}
+
+async function resolveVacuumCommand(payload, node, device, RED) {
+    const named = await withNamedRooms(payload, node, device, RED);
+    return resolveCommand(named, node.command);
+}
+
+async function withNamedRooms(payload, node, device, RED) {
+    if (!payload || typeof payload !== "object" || Array.isArray(payload) || payload.method) {
         return payload;
     }
-    if (payload.segments || payload.rooms || payload.ids) {
+    const command = String(payload.command || payload.cmd || "").trim().toLowerCase();
+    const isRooms = command === "rooms" || command === "segments" || command === "room" || command === "segment";
+    if (!isRooms) {
         return payload;
     }
-    const ids = payload.names.map((name) => segmentIdForName(name, device.rooms));
+    if (payload.segments || payload.rooms || payload.ids || payload.params) {
+        return payload;
+    }
+    let names = payload.names;
+    if (!Array.isArray(names) && payload.name != null && payload.name !== "") {
+        names = [payload.name];
+    }
+    if (!Array.isArray(names) || names.length === 0) {
+        return payload;
+    }
+    let catalog = null;
+    if (names.some((name) => !isPlainSegmentLabel(name))) {
+        const cloudRooms = await loadCloudRooms(RED, device && device.account);
+        const read = await readMapCatalog(
+            (method, params) => node.session.client.request(method, params),
+            cloudRooms
+        );
+        catalog = read.catalog;
+        if (read.status) {
+            publishStatus(node, device, read.status, true);
+        }
+    }
+    const ids = resolveRoomTargets(names, catalog);
     return { ...payload, segments: ids };
 }
 

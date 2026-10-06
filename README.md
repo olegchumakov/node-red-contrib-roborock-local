@@ -54,7 +54,6 @@ If Home Assistant's Roborock integration is already signed in, you can skip the 
     "name": "S7",
     "protocol": "auto",
     "pv": "1.0",
-    "rooms": "[]",
     "credentials": {
       "ip": "192.168.1.20",
       "duid": "YOUR_DUID",
@@ -67,24 +66,53 @@ If Home Assistant's Roborock integration is already signed in, you can skip the 
 
 Node-RED copies `credentials` into the encrypted credential store and strips them from `flows.json`. `localKey` is the credential name (camelCase). A `pv` of `1.0` makes **Auto** skip the L01 hello.
 
-### Maps and rooms (optional)
+### Maps and rooms
 
-Whole-floor cleaning (`start`, `dock`, fan, mop) does not need a map. On the device node, **Maps & rooms (optional)** is collapsed until you open it.
+Whole-floor cleaning (`start`, `dock`, fan, mop) does not need a map. The device editor does not store a map and does not switch floors.
 
-**Read maps** lists floors from `get_multi_maps_list`. Names are the UTF-8 text the robot sends (for example `1 этаж` and `2 этаж`) and are not percent-decoded. The loaded floor is marked current. **Load** switches the robot to that floor with `load_multi_map`. The parameter is a single number, `[mapFlag]`, including when the editor or a message passed the flag as a string.
+**Show maps & rooms** on the device node is a read-only list: map name, map id (`mapFlag`), and room ids. Nothing from that list is written into the node. The button never sends `load_multi_map`.
 
-`get_room_mapping` returns room segments for the loaded map only. A robot whose map was never split into rooms returns `[]`. That is normal on an S7. The editor says the map has no rooms split, whole-floor cleaning still works, and rooms are added in the Roborock app. The device config does not ask you to type segment ids. If `get_room_mapping` itself fails, the floor list is still shown.
+`get_multi_maps_list` is the floor list. Names are the UTF-8 text the robot sends (for example `1 этаж` and `2 этаж`) and are not percent-decoded. On some firmware each `map_info` entry also has a `rooms` array (`id`, and sometimes `iot_name`). Those ids are shown for every floor, including floors that are not loaded.
 
-Clean a room by sending the segment id on the vacuum node:
+`get_room_mapping` returns segments for the **loaded map only**, as `[segmentId, cloudRoomId, tag]`. The third number is a room-type tag, not a map id. `[]` means that loaded map reported no segments. It does not mean another floor has no rooms. When a floor is not loaded and its `map_info` entry has no `rooms` array, the list says `rooms visible when this map is loaded`. Switch to that floor with a command, then read again. There is no read-only call that returns those segments on an S7 that omits `rooms` from `get_multi_maps_list`.
+
+Room names come from the Roborock account home `rooms` list (`id` → `name`), using the account session cache or the saved account credentials. A name is attached only when `get_room_mapping` links that segment to that cloud room id. Home rooms that are not linked are ignored, so old names still on the account (for example `Главная спальня`) are not shown and cannot be used as commands. If the map list itself sent `iot_name` on a room, that name is shown next to the id. If the account session cannot be read, the ids are still listed.
 
 ```json
-{"command":"rooms","segments":[16]}
-{"command":"rooms","names":["Room 16"]}
-{"command":"maps"}
+{"command":"map_rooms"}
 {"command":"map","mapFlag":1}
+{"command":"rooms","segments":[16]}
+{"command":"rooms","names":["Kitchen"]}
 ```
 
-`names:["16"]` is segment 16 even before you press Read maps.
+`map_rooms` (alias `maps_rooms`) sets `msg.payload` to the same list the editor shows:
+
+```json
+{
+  "currentMapFlag": 1,
+  "maps": [
+    {
+      "name": "2 этаж",
+      "mapFlag": 1,
+      "current": true,
+      "segments": [{ "segmentId": 16, "name": "Kitchen" }, { "segmentId": 17 }]
+    },
+    {
+      "name": "1 этаж",
+      "mapFlag": 2,
+      "current": false,
+      "segments": [],
+      "note": "rooms visible when this map is loaded"
+    }
+  ]
+}
+```
+
+`{"command":"maps"}` is unchanged: it still returns the raw `get_multi_maps_list` result.
+
+`{"command":"map","mapFlag":1}` sends `load_multi_map` with `[1]`. A numeric string is coerced. `id` is accepted in place of `mapFlag` (`{"command":"map","id":2}`).
+
+`{"command":"rooms","segments":[16,17],"repeat":1}` cleans those segment ids on the **loaded** map. It does not switch floors. `{"command":"rooms","names":["Kitchen"]}` (or `"name":"Kitchen"`) resolves the name only when exactly one listed segment has it. Two matches are an error. `names:["16"]` and `names:["Room 16"]` are segment 16.
 
 ### When the key stops working
 
@@ -103,10 +131,11 @@ Clean a room by sending the segment id on the vacuum node:
 | `status` | `get_status` |
 | `{"command":"fan","speed":"turbo"}` | `set_custom_mode` |
 | `{"command":"mop","intensity":"low"}` | `set_water_box_custom_mode` |
-| `{"command":"rooms","segments":[16,17],"repeat":1}` | `app_segment_clean` |
-| `{"command":"rooms","names":["Room 16"]}` | segment 16 (`16` or `Room 16` also work) |
-| `{"command":"maps"}` | `get_multi_maps_list` |
-| `{"command":"map","mapFlag":1}` | `load_multi_map` (switches floor) |
+| `{"command":"rooms","segments":[16,17],"repeat":1}` | `app_segment_clean` on the loaded map |
+| `{"command":"rooms","names":["Kitchen"]}` | same, when that name matches one segment |
+| `{"command":"map_rooms"}` | maps and room ids (`msg.payload` is the list above) |
+| `{"command":"maps"}` | raw `get_multi_maps_list` |
+| `{"command":"map","mapFlag":1}` | `load_multi_map` with `[1]` (switches floor) |
 | `{"command":"zone","zones":[[x1,y1,x2,y2,1]]}` | `app_zoned_clean` |
 | `{"method":"get_consumable","params":[]}` | that method, unchanged |
 
@@ -153,7 +182,7 @@ With neither `--code` nor `--password`, it sends a code and asks for it on the t
 - **Decrypt failed / RPC timeout after a successful socket connect.** The `local_key` does not match this robot anymore. Fetch it again.
 - **Find on LAN hears nothing.** The robot broadcasts on UDP 58866 only now and then. The button listens for about 8 seconds. Type the IP if nothing arrives. Discovery is optional.
 - **UDP 58866 already in use (EADDRINUSE).** Another program on this same machine, often Home Assistant's Roborock integration, already bound that port. Discovery works when Home Assistant is not on this host. Type the IP, or stop the other listener and try again.
-- **No rooms on the current map.** `get_room_mapping` returns `[]` when that floor has no room split. That is normal. Whole-floor cleaning still works. Add rooms in the Roborock app, or pass segment ids in `msg.payload` once the app has created them. If the mapping call fails, the floor names are still shown.
+- **A floor shows no rooms.** `get_room_mapping` only describes the loaded map. Another floor says `rooms visible when this map is loaded` when `get_multi_maps_list` did not include a `rooms` array for it. Switch with `{"command":"map","mapFlag":N}`, then `{"command":"map_rooms"}`. An empty mapping on the floor that is actually loaded means that floor reported no segments.
 - **`No CONNACK for L01`.** This firmware speaks protocol 1.0. Leave protocol on Auto and keep `pv` at `1.0` (filled from the account), or set the protocol dropdown to 1.0. Auto then does not wait on an L01 hello. Forced L01 still reports this error.
 - **Auto-detect region fails.** Pick Russia / Europe / US / China. The URL must be `https://*.roborock.com`.
 - **Code 2018.** The email code was wrong or expired. Send another.
@@ -193,8 +222,8 @@ The protocol behavior was reimplemented from public documentation and the Apache
 2. Вход в облако только в конфиге **roborock account** (его можно добавить из поля Account у устройства). Код из почты, пароль или **Import Home Assistant session**. Для региона RU оставьте автоопределение или выберите Russia (`https://ruiot.roborock.com`). Нажмите Done. Deploy пока не нужен.
 3. Вернитесь к устройству и нажмите **Fetch devices from account**. Выберите пылесос. Если DUID пустой и в аккаунте один робот, поля заполнятся сами.
 4. IP часто не приходит из облака: **Find on LAN** или впишите адрес. Если UDP 58866 занят (часто Home Assistant на этой же машине), впишите IP. Done, затем один Deploy.
-5. Команды: `start`, `pause`, `stop`, `dock`, `find`, `status`, либо `{command:"fan", speed:"turbo"}` и `{command:"rooms", segments:[16]}`. Карты этажей спрятаны в **Maps & rooms (optional)**.
-6. Пустой `get_room_mapping` (`[]`) — это нормально, если этаж не разбит на комнаты. Уборка всего этажа работает. Комнаты добавляются в приложении Roborock. Сессия Home Assistant вставляется только в аккаунт, не в устройство. IP, DUID, `localKey` и model хранятся в credentials устройства, не в JSON потока.
+5. Команды: `start`, `pause`, `stop`, `dock`, `find`, `status`, либо `{command:"fan", speed:"turbo"}`. Карты: `{command:"map_rooms"}` — список этажей и id комнат, без переключения. `{command:"map", mapFlag:1}` — загрузить этаж. `{command:"rooms", segments:[16]}` — убрать комнаты по id на загруженном этаже. Имя (`names`) сработает только если оно однозначно привязано к сегменту.
+6. `get_room_mapping` возвращает комнаты только загруженного этажа. Если в `get_multi_maps_list` у другого этажа нет массива `rooms`, в списке будет `rooms visible when this map is loaded`. Старые имена из облака, которые не связаны с сегментом через `get_room_mapping`, не показываются. Кнопка **Show maps & rooms** ничего не сохраняет и не переключает этаж. IP, DUID, `localKey` и model хранятся в credentials устройства, не в JSON потока.
 
 `local_key` меняется после сброса Wi-Fi или повторного добавления робота в приложение. Тогда снова нажмите получение устройств и сделайте Deploy. Если команды висят по таймауту, проверьте что с машины Node-RED открывается TCP 58867 и что ключ не устарел.
 
