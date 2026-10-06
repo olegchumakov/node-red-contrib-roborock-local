@@ -99,6 +99,85 @@ describe("node-red nodes", () => {
         assert.match(response.body.error, /rriot/i);
     });
 
+    test("read maps still returns the map list when get_room_mapping fails", async () => {
+        const mock = await startMock((rpc) => {
+            if (rpc.method === "get_status") {
+                return [{
+                    state: 8,
+                    battery: 100,
+                    error_code: 0,
+                    map_status: 11,
+                    lab_status: 3,
+                    unsave_map_flag: 2
+                }];
+            }
+            if (rpc.method === "get_multi_maps_list") {
+                return [{
+                    max_multi_map: 4,
+                    max_bak_map: 1,
+                    multi_map_count: 2,
+                    map_info: [
+                        { mapFlag: 1, add_time: 1693646551, length: 10, name: "2 этаж", bak_maps: [{ mapFlag: 5, add_time: 1682500367 }] },
+                        { mapFlag: 2, add_time: 1791144593, length: 10, name: "1 этаж", bak_maps: [{ mapFlag: 6, add_time: 1789666028 }] }
+                    ]
+                }];
+            }
+            if (rpc.method === "get_room_mapping") {
+                throw new Error("mapping unavailable");
+            }
+            return ["ok"];
+        });
+        try {
+            const flow = [
+                {
+                    id: "dev1",
+                    type: "roborock-device",
+                    name: "S7",
+                    protocol: "1.0",
+                    pv: "1.0",
+                    rooms: "[]",
+                    port: mock.port,
+                    pingIntervalMs: 0,
+                    helloTimeoutMs: 1000,
+                    requestTimeoutMs: 1000
+                }
+            ];
+            await helper.load(register, flow, {
+                dev1: {
+                    ip: "127.0.0.1",
+                    duid: "DUID1",
+                    localKey: "testlocalkey1234",
+                    model: "roborock.vacuum.a15"
+                }
+            });
+            const response = await helper.request()
+                .post("/roborock-local/map-rooms")
+                .send({
+                    nodeId: "dev1",
+                    ip: "127.0.0.1",
+                    localKey: "testlocalkey1234",
+                    pv: "1.0",
+                    protocol: "1.0"
+                });
+            assert.equal(response.status, 200);
+            assert.equal(response.body.ok, true);
+            assert.equal(response.body.maps[0].name, "2 этаж");
+            assert.equal(response.body.maps[1].name, "1 этаж");
+            assert.equal(response.body.currentMapFlag, 2);
+            assert.equal(response.body.maps[1].current, true);
+            assert.deepEqual(response.body.segments, []);
+            assert.match(response.body.mappingError, /mapping unavailable/);
+            assert.match(response.body.warning, /Could not read segments/);
+            assert.match(response.body.warning, /1 этаж/);
+            assert.match(response.body.warning, /not used/);
+            assert.equal(response.body.warning.includes("lab_status"), false);
+            assert.equal(response.body.warning.includes("often means"), false);
+            assert.equal(JSON.stringify(response.body).includes("testlocalkey1234"), false);
+        } finally {
+            await mock.close();
+        }
+    });
+
     test("admin send-code rejects a missing email", async () => {
         await helper.load(register, []);
         const response = await helper.request()

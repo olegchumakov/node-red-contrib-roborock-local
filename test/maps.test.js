@@ -6,7 +6,7 @@ const dgram = require("dgram");
 const { RoborockClient } = require("../lib/client");
 const { discover } = require("../lib/discovery");
 const { parseImportedSession, CloudError } = require("../lib/cloud");
-const { resolveCommand, segmentIdForName } = require("../lib/commands");
+const { resolveCommand, segmentIdForName, assertReadOnlyCommand } = require("../lib/commands");
 const {
     currentMapFlag,
     normalizeMapList,
@@ -16,40 +16,53 @@ const {
 } = require("../lib/maps");
 
 describe("maps and protocol selection", () => {
-    test("current map flag follows map_status", () => {
+    test("current map flag follows map_status only for the 4n+3 pattern", () => {
         assert.equal(currentMapFlag(3), 0);
         assert.equal(currentMapFlag(7), 1);
         assert.equal(currentMapFlag(11), 2);
+        assert.equal(currentMapFlag(15), 3);
         assert.equal(currentMapFlag(0), null);
+        assert.equal(currentMapFlag(1), null);
+        assert.equal(currentMapFlag(4), null);
+        assert.equal(currentMapFlag(5), null);
+        assert.equal(currentMapFlag(6), null);
+        assert.equal(currentMapFlag(8), null);
+        assert.equal(currentMapFlag(12), null);
+        assert.equal(currentMapFlag(1.5), null);
         assert.equal(currentMapFlag(undefined), null);
+        assert.equal(currentMapFlag("11"), 2);
     });
 
-    test("map names come from get_multi_maps_list and segments are numbered", () => {
+    test("map names are kept as plain UTF-8, including a literal percent sign", () => {
         const maps = normalizeMapList([{
             max_multi_map: 4,
+            max_bak_map: 1,
             multi_map_count: 2,
             map_info: [
-                { mapFlag: 0, name: "1%20%D1%8D%D1%82%D0%B0%D0%B6", length: 8 },
-                { mapFlag: 1, name: "2 этаж", length: 5 }
+                { mapFlag: 1, add_time: 1693646551, length: 10, name: "2 этаж", bak_maps: [{ mapFlag: 5, add_time: 1682500367 }] },
+                { mapFlag: 2, add_time: 1791144593, length: 10, name: "1 этаж", bak_maps: [{ mapFlag: 6, add_time: 1789666028 }] },
+                { mapFlag: 3, name: "Дом%20", length: 6 }
             ]
         }]);
-        assert.equal(maps[0].name, "1 этаж");
-        assert.equal(maps[1].name, "2 этаж");
-        const segments = normalizeSegments([[16, "13665932", 0], [17, "13665933", 0]], 0);
-        assert.deepEqual(segments, [
-            { segmentId: 16, name: "Room 16", mapFlag: 0 },
-            { segmentId: 17, name: "Room 17", mapFlag: 0 }
-        ]);
-        assert.match(describeMaps(maps, segments, 0), /1 этаж \(current\)/);
-        assert.match(describeMaps(maps, segments, 0), /Room 16/);
+        assert.equal(maps[0].name, "2 этаж");
+        assert.equal(maps[1].name, "1 этаж");
+        assert.equal(maps[2].name, "Дом%20");
+        assert.equal(currentMapFlag(11), 2);
+        const segments = normalizeSegments([], 2);
+        assert.deepEqual(segments, []);
+        assert.match(describeMaps(maps, segments, 2), /1 этаж \(current\)/);
+        assert.equal(describeMaps(maps, segments, 2).includes("Дом "), false);
     });
 
-    test("empty mapping names the current map and does not invent cloud room names", () => {
-        const warning = emptySegmentWarning({ mapName: "1 этаж", labStatus: 3, unsaveMapFlag: 2 });
+    test("empty mapping does not claim lab_status means missing room splits", () => {
+        const warning = emptySegmentWarning({ mapName: "1 этаж" });
         assert.match(warning, /No segments returned for the current map "1 этаж"/);
-        assert.match(warning, /lab_status 3/);
-        assert.match(warning, /unsave_map_flag 2/);
-        assert.match(warning, /not used/);
+        assert.match(warning, /Enter numbered segment ids by hand/);
+        assert.match(warning, /load another map and read again/);
+        assert.match(warning, /Cloud home room names are not used/);
+        assert.equal(warning.includes("lab_status"), false);
+        assert.equal(warning.includes("unsave_map_flag"), false);
+        assert.equal(warning.includes("often means"), false);
         assert.equal(warning.includes("Главная спальня"), false);
     });
 
@@ -85,6 +98,13 @@ describe("maps and protocol selection", () => {
             params: [[1]]
         });
         assert.equal(resolveCommand("maps").method, "get_multi_maps_list");
+        assert.doesNotThrow(() => assertReadOnlyCommand(resolveCommand("get_status"), false));
+        assert.doesNotThrow(() => assertReadOnlyCommand(resolveCommand("get_consumable"), false));
+        assert.doesNotThrow(() => assertReadOnlyCommand(resolveCommand("maps"), false));
+        assert.doesNotThrow(() => assertReadOnlyCommand(resolveCommand("get_room_mapping"), false));
+        assert.throws(() => assertReadOnlyCommand(resolveCommand("start"), false), /--allow-write/);
+        assert.doesNotThrow(() => assertReadOnlyCommand(resolveCommand("start"), true));
+        assert.doesNotThrow(() => assertReadOnlyCommand(resolveCommand({ command: "map", mapFlag: 1 }), true));
     });
 
     test("imported Home Assistant session is accepted without echoing secrets", () => {

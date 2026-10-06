@@ -75,7 +75,9 @@ Node-RED copies `credentials` into the encrypted credential store and strips the
 
 **Read maps** calls `get_multi_maps_list` and `get_room_mapping` for the map that is currently loaded. Map names come from the robot (floor names such as `1 этаж`). Segments are stored as **Room 16**, **Room 17**, and so on. **Load** sends `load_multi_map` and switches the robot onto that floor, then reads segments again.
 
-Rooms that were never given names in the app often produce an empty `get_room_mapping` for that map. The editor says **no segments returned for the current map** and includes `lab_status` / `unsave_map_flag` when the status has them. Type segment ids yourself, one per line (`16` or `16 Hall`). Cloud home entries such as old default room labels are not segment ids and are not used.
+Map names are the UTF-8 text the robot sends. They are kept as-is (a name that happens to contain `%` is not percent-decoded).
+
+Rooms that were never given names in the app often produce an empty `get_room_mapping` for the loaded map. The editor then says no segments were returned for this map, and that you can enter numbered segment ids by hand or load another map and read again. If `get_room_mapping` itself fails, the map list is still returned, with `mappingError` and the same kind of warning. Type segment ids yourself, one per line (`16` or `16 Hall`). Cloud home entries such as old default room labels are not segment ids and are not used. `lab_status` and `unsave_map_flag` are status fields; they are not treated as a statement that the map has no room splits.
 
 ```json
 {"command":"rooms","segments":[16]}
@@ -127,12 +129,15 @@ One TCP connection is shared by every vacuum node that points at the same device
 These commands are for a machine on the same LAN as the vacuum. They are not run by CI.
 
 ```bash
-npx roborock-local-test --ip 192.168.1.20 --duid YOUR_DUID --key YOUR_LOCAL_KEY
-npx roborock-local-test --ip 192.168.1.20 --key YOUR_LOCAL_KEY --command start
-node scripts/local-test.js --ip 192.168.1.20 --key YOUR_LOCAL_KEY --protocol 1.0
+ROBOROCK_LOCAL_KEY=YOUR_LOCAL_KEY npx roborock-local-test --ip 192.168.1.20 --duid YOUR_DUID
+printf '%s\n' "$ROBOROCK_LOCAL_KEY" | npx roborock-local-test --ip 192.168.1.20 --command get_multi_maps_list
+npx roborock-local-test --ip 192.168.1.20 --command start --allow-write
+node scripts/local-test.js --ip 192.168.1.20 --protocol 1.0 --pv 1.0
 ```
 
-`get_status` is the default. A successful run prints JSON with `protocol` (`1.0` or `L01`), `hello` (`app` or `python`), and the status.
+The local key is taken from `ROBOROCK_LOCAL_KEY`, from the first line of stdin when stdin is not a terminal, or from a prompt. `--key` still works and prints a warning, because the value is stored in shell history. Do not put the key on the command line if you can avoid it. The process never prints the key back.
+
+`get_status` is the default. Other getters (`get_consumable`, `get_multi_maps_list`, `get_room_mapping`, and any other `get_*` method) are allowed too. `start`, `load_multi_map`, and every other command are refused unless you pass `--allow-write`. That limit is only on this CLI. The vacuum node still accepts `start`, `pause`, and map loads. A successful run prints JSON with `protocol` (`1.0` or `L01`), `hello` (`app` or `python`), and the result.
 
 Cloud login, which prints DUIDs and local keys (treat the output as a secret):
 
@@ -150,7 +155,7 @@ With neither `--code` nor `--password`, it sends a code and asks for it on the t
 - **Decrypt failed / RPC timeout after a successful socket connect.** The `local_key` does not match this robot anymore. Fetch it again.
 - **Find on LAN hears nothing.** The robot broadcasts on UDP 58866 only now and then. The button listens for about 8 seconds. Type the IP if nothing arrives. Discovery is optional.
 - **UDP 58866 already in use (EADDRINUSE).** Another program on this same machine, often Home Assistant's Roborock integration, already bound that port. Discovery works when Home Assistant is not on this host. Type the IP, or stop the other listener and try again.
-- **No segments returned for the current map.** `get_room_mapping` only lists the loaded map, and an S7 with numbered, unnamed rooms can return `[]` even though `get_multi_maps_list` has floor names. Load the other map, or type segment ids. Do not treat cloud home room names as segment ids.
+- **No segments returned for the current map.** `get_room_mapping` only lists the loaded map, and an S7 with numbered, unnamed rooms can return `[]` even though `get_multi_maps_list` has floor names. Load the other map, or type segment ids. If the mapping call fails, the map names are still shown and the warning includes `mappingError`. Do not treat cloud home room names as segment ids.
 - **`No CONNACK for L01`.** This firmware speaks protocol 1.0. Leave protocol on Auto and keep `pv` at `1.0` (filled from the account), or set the protocol dropdown to 1.0. Auto then does not wait on an L01 hello. Forced L01 still reports this error.
 - **Auto-detect region fails.** Pick Russia / Europe / US / China. The URL must be `https://*.roborock.com`.
 - **Code 2018.** The email code was wrong or expired. Send another.

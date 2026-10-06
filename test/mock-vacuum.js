@@ -7,7 +7,7 @@ const { PROTOCOL } = require("../lib/constants");
 
 const LOCAL_KEY = "testlocalkey1234";
 
-function startMock() {
+function startMock(handler) {
     const requests = [];
     const sockets = new Set();
     const server = net.createServer((socket) => {
@@ -39,8 +39,19 @@ function startMock() {
                 const decoded = decodeRpcPayload(plain);
                 requests.push(decoded.rpc);
                 let result = ["ok"];
-                if (decoded.rpc && decoded.rpc.method === "get_status") {
-                    result = [{ state: 8, battery: 87, error_code: 0, fan_power: 101 }];
+                let error;
+                try {
+                    if (typeof handler === "function") {
+                        const produced = handler(decoded.rpc || {});
+                        if (produced !== undefined) {
+                            result = produced;
+                        }
+                    } else if (decoded.rpc && decoded.rpc.method === "get_status") {
+                        result = [{ state: 8, battery: 87, error_code: 0, fan_power: 101 }];
+                    }
+                } catch (err) {
+                    error = { message: err.message };
+                    result = undefined;
                 }
                 const timestamp = 1700001111;
                 socket.write(encodeDataFrame({
@@ -49,7 +60,12 @@ function startMock() {
                     random: 7,
                     timestamp,
                     protocol: PROTOCOL.PUBLISH,
-                    payload: encodeRpcResponse({ id: decoded.rpc.id, result, timestamp }),
+                    payload: encodeRpcResponse({
+                        id: decoded.rpc && decoded.rpc.id,
+                        result,
+                        error,
+                        timestamp
+                    }),
                     localKey: LOCAL_KEY
                 }));
             }
