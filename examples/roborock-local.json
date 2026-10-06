@@ -1,0 +1,150 @@
+[
+    {
+        "id": "c0ffee00roborocktab",
+        "type": "tab",
+        "label": "Roborock local",
+        "disabled": false,
+        "info": "Local control of a Roborock vacuum. Edit the device config and fill IP, DUID, and local key before deploying."
+    },
+    {
+        "id": "c0ffee00rrcomment01",
+        "type": "comment",
+        "z": "c0ffee00roborocktab",
+        "name": "How to use this example",
+        "info": "1. Double-click the roborock device config (or add a roborock account, sign in with the emailed code, deploy, then fetch devices).\n2. Pick your vacuum. Find on LAN fills the IP when UDP 58866 can hear the robot.\n3. Deploy. Inject start / dock / status. Output 1 is the command result. Output 2 is status.\n\nlocal_key is stored in credentials and is intentionally absent from this example.\nThe local key changes after a Wi-Fi reset — fetch it again if commands start timing out.\n\nThis package is unofficial and is not affiliated with Roborock.",
+        "x": 260,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "c0ffee00rrdevice001",
+        "type": "roborock-device",
+        "name": "My Roborock",
+        "account": "",
+        "deviceName": "",
+        "protocol": "auto",
+        "region": "auto",
+        "baseUrl": "",
+        "firmware": "",
+        "rooms": "[]"
+    },
+    {
+        "id": "c0ffee00rrvacuum001",
+        "type": "roborock-vacuum",
+        "z": "c0ffee00roborocktab",
+        "name": "vacuum",
+        "device": "c0ffee00rrdevice001",
+        "command": "",
+        "pollInterval": 30,
+        "statusOnChange": true,
+        "x": 420,
+        "y": 200,
+        "wires": [
+            ["c0ffee00rrdebugres1"],
+            ["c0ffee00rrdebugsta1"]
+        ]
+    },
+    {
+        "id": "c0ffee00rrinjectst1",
+        "type": "inject",
+        "z": "c0ffee00roborocktab",
+        "name": "start",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "start",
+        "payloadType": "str",
+        "x": 190,
+        "y": 160,
+        "wires": [
+            ["c0ffee00rrvacuum001"]
+        ]
+    },
+    {
+        "id": "c0ffee00rrinjectdk1",
+        "type": "inject",
+        "z": "c0ffee00roborocktab",
+        "name": "dock",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "dock",
+        "payloadType": "str",
+        "x": 190,
+        "y": 200,
+        "wires": [
+            ["c0ffee00rrvacuum001"]
+        ]
+    },
+    {
+        "id": "c0ffee00rrinjectsu1",
+        "type": "inject",
+        "z": "c0ffee00roborocktab",
+        "name": "status",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "status",
+        "payloadType": "str",
+        "x": 190,
+        "y": 240,
+        "wires": [
+            ["c0ffee00rrvacuum001"]
+        ]
+    },
+    {
+        "id": "c0ffee00rrdebugres1",
+        "type": "debug",
+        "z": "c0ffee00roborocktab",
+        "name": "result",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 640,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "c0ffee00rrdebugsta1",
+        "type": "debug",
+        "z": "c0ffee00roborocktab",
+        "name": "status",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 640,
+        "y": 240,
+        "wires": []
+    }
+]

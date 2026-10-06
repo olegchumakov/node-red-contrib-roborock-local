@@ -1,0 +1,144 @@
+<script type="text/html" data-template-name="roborock-account">
+    <div class="form-row">
+        <label for="node-config-input-name"><i class="fa fa-tag"></i> Name</label>
+        <input type="text" id="node-config-input-name" placeholder="Roborock account">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-email"><i class="fa fa-envelope"></i> Email</label>
+        <input type="text" id="node-config-input-email" placeholder="you@example.com" autocomplete="off">
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-region"><i class="fa fa-globe"></i> Region</label>
+        <select id="node-config-input-region" style="width:70%">
+            <option value="auto">Auto-detect from the email</option>
+            <option value="ru">Russia — ruiot.roborock.com</option>
+            <option value="eu">Europe — euiot.roborock.com</option>
+            <option value="us">United States — usiot.roborock.com</option>
+            <option value="cn">China — cniot.roborock.com</option>
+        </select>
+    </div>
+    <div class="form-row">
+        <label for="node-config-input-baseUrl"><i class="fa fa-link"></i> Cloud URL</label>
+        <input type="text" id="node-config-input-baseUrl" placeholder="filled after auto-detect">
+    </div>
+    <div class="form-tips">Leave the URL empty unless auto-detect picked the wrong server. It must be an https://*.roborock.com address.</div>
+    <div class="form-row">
+        <button type="button" class="red-ui-button" id="rr-account-send">Send code</button>
+        <input type="text" id="rr-account-code" placeholder="email code" style="width:30%" autocomplete="off">
+        <button type="button" class="red-ui-button" id="rr-account-code-login">Log in with code</button>
+    </div>
+    <div class="form-row">
+        <input type="password" id="rr-account-password" placeholder="password (optional)" style="width:50%" autocomplete="new-password">
+        <button type="button" class="red-ui-button" id="rr-account-pass-login">Log in with password</button>
+    </div>
+    <div class="form-tips" id="rr-account-status">Sign in once so a Roborock device node can download DUID and local_key. The password and session stay in Node-RED credentials, not in the flow file.</div>
+    <input type="password" id="node-config-input-userData" style="display:none" autocomplete="off">
+    <input type="hidden" id="node-config-input-clientId">
+</script>
+
+<script type="text/html" data-help-name="roborock-account">
+    <p>Signs in to a Roborock account so <code>roborock-device</code> can download the vacuum's DUID and <code>local_key</code>. Day-to-day control does not use the cloud.</p>
+    <h3>Steps</h3>
+    <ol>
+        <li>Enter the email address from the Roborock app. Pick Russia, Europe, US, or China if auto-detect fails. Russia is <code>https://ruiot.roborock.com</code>.</li>
+        <li>Click <b>Send code</b>, then enter the code from the email. Password login is also available for older accounts.</li>
+        <li>Deploy. Then open a Roborock device node and click <b>Fetch devices</b>.</li>
+    </ol>
+    <h3>When the key changes</h3>
+    <p><code>local_key</code> changes after the robot is removed and added again, or after a Wi-Fi reset. Sign in and fetch devices again, then deploy. Commands that time out or fail to decrypt usually mean the stored key is stale.</p>
+    <p>This package is unofficial and is not affiliated with Roborock.</p>
+</script>
+
+<script type="text/javascript">
+(function () {
+    function postJSON(url, body) {
+        return $.ajax({
+            url: url,
+            type: "POST",
+            contentType: "application/json; charset=UTF-8",
+            data: JSON.stringify(body),
+            dataType: "json"
+        });
+    }
+    function setStatus(text, isError) {
+        $("#rr-account-status").text(text).css("color", isError ? "#a00" : "");
+    }
+    RED.nodes.registerType("roborock-account", {
+        category: "config",
+        defaults: {
+            name: { value: "" },
+            region: { value: "auto" },
+            baseUrl: { value: "" }
+        },
+        credentials: {
+            email: { type: "text" },
+            clientId: { type: "text" },
+            userData: { type: "password" }
+        },
+        label: function () {
+            return this.name || this.credentials && this.credentials.email || "roborock account";
+        },
+        oneditprepare: function () {
+            const node = this;
+            node._sessionUserData = null;
+            function payload() {
+                return {
+                    email: $("#node-config-input-email").val(),
+                    region: $("#node-config-input-region").val(),
+                    baseUrl: $("#node-config-input-baseUrl").val(),
+                    clientId: $("#node-config-input-clientId").val()
+                };
+            }
+            function remember(data) {
+                if (data.clientId) {
+                    $("#node-config-input-clientId").val(data.clientId);
+                }
+                if (data.baseUrl) {
+                    $("#node-config-input-baseUrl").val(data.baseUrl);
+                }
+                if (data.userData) {
+                    node._sessionUserData = data.userData;
+                    $("#node-config-input-userData").val(JSON.stringify(data.userData));
+                }
+            }
+            $("#rr-account-send").on("click", function () {
+                setStatus("Requesting a verification code...");
+                postJSON("roborock-local/send-code", payload()).done(function (data) {
+                    remember(data);
+                    setStatus(data.message || "Code sent.");
+                }).fail(function (xhr) {
+                    setStatus((xhr.responseJSON && xhr.responseJSON.error) || "Could not send the code", true);
+                });
+            });
+            $("#rr-account-code-login").on("click", function () {
+                setStatus("Signing in...");
+                postJSON("roborock-local/login", Object.assign(payload(), { code: $("#rr-account-code").val() }))
+                    .done(function (data) {
+                        remember(data);
+                        setStatus((data.message || "Signed in.") + " Deploy, then fetch devices from a Roborock device node.");
+                    })
+                    .fail(function (xhr) {
+                        setStatus((xhr.responseJSON && xhr.responseJSON.error) || "Login failed", true);
+                    });
+            });
+            $("#rr-account-pass-login").on("click", function () {
+                setStatus("Signing in with password...");
+                postJSON("roborock-local/login", Object.assign(payload(), { password: $("#rr-account-password").val() }))
+                    .done(function (data) {
+                        remember(data);
+                        $("#rr-account-password").val("");
+                        setStatus((data.message || "Signed in.") + " Deploy, then fetch devices from a Roborock device node.");
+                    })
+                    .fail(function (xhr) {
+                        setStatus((xhr.responseJSON && xhr.responseJSON.error) || "Login failed", true);
+                    });
+            });
+        },
+        oneditsave: function () {
+            if (this._sessionUserData) {
+                $("#node-config-input-userData").val(JSON.stringify(this._sessionUserData));
+            }
+        }
+    });
+})();
+</script>
