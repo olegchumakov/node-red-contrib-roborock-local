@@ -89,6 +89,16 @@ describe("node-red nodes", () => {
         await mock.close();
     });
 
+    test("admin import-session rejects a token without rriot and does not echo it", async () => {
+        await helper.load(register, []);
+        const response = await helper.request()
+            .post("/roborock-local/import-session")
+            .send({ userData: { token: "super-secret-token" } });
+        assert.equal(response.status, 400);
+        assert.equal(JSON.stringify(response.body).includes("super-secret-token"), false);
+        assert.match(response.body.error, /rriot/i);
+    });
+
     test("admin send-code rejects a missing email", async () => {
         await helper.load(register, []);
         const response = await helper.request()

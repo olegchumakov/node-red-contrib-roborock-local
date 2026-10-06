@@ -12,6 +12,7 @@ module.exports = function (RED) {
         this.region = config.region || "auto";
         this.baseUrl = config.baseUrl || "";
         this.firmware = config.firmware || "";
+        this.pv = config.pv || "";
         this.rooms = parseRooms(config.rooms);
         this.port = Number(config.port) > 0 ? Number(config.port) : undefined;
         this.helloTimeoutMs = Number(config.helloTimeoutMs) > 0 ? Number(config.helloTimeoutMs) : undefined;

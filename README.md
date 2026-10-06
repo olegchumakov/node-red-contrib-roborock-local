@@ -33,14 +33,58 @@ You need three values the robot already has: its **IP**, **DUID**, and **local_k
 1. Drag in a **roborock device** config (the vacuum node asks for one). Optionally add a **roborock account** if several vacuums share one login.
 2. Enter the email address of the Roborock app account.
 3. Leave region on **Auto-detect**, or pick one. Russia is `https://ruiot.roborock.com`, Europe `euiot`, United States `usiot`, China `cniot`.
-4. Click **Send code**, then enter the code from the email and **Log in with code**. Password login is there for older accounts; many newer accounts only accept the code.
-5. Click your vacuum in the list. That fills DUID, model, firmware, and `local_key`.
-6. Set the IP. The cloud list usually has no address. **Find on LAN** listens for a few seconds on UDP **58866**, where the robot announces itself, and fills the IP when the DUID matches. You can also type the address from your router.
+4. Click **Send code**, then enter the code from the email and **Log in with code**. Password login is there for older accounts; many newer accounts only accept the code. Or paste an existing session (see below) and click **Import session**.
+5. Click your vacuum in the list. That fills DUID, model, firmware, `local_key`, and protocol version `pv` when the account has one.
+6. Set the IP. The cloud list usually has no address. **Find on LAN** listens for about 8 seconds on UDP **58866** (an S7 was heard in about 6). You can also type the address from your router.
 7. Deploy.
 
 After that, the vacuum node does not contact Roborock's cloud.
 
-**Match room names** (optional) connects locally, calls `get_room_mapping`, and joins segment ids with the room names from the account. You can then clean by name. Until you do that, pass segment ids.
+`ip`, `duid`, `localKey`, and `model` are **credentials**. They are not ordinary config fields, and they do not appear in an exported flow. Set a stable `credentialSecret` before you copy the credential store to another machine.
+
+### Import a Home Assistant session
+
+If Home Assistant's Roborock integration is already signed in, you can skip the email code. In `.storage/core.config_entries`, open the `roborock` entry and copy `data.user_data` (or the whole entry, so `data.base_url` and `data.username` come with it). Paste that into **Existing session** on the account or device config and click **Import session**. The node checks that `rriot` is present, loads the device list, and stores the session in the `userData` credential. The pasted JSON is not written to the Node-RED log or to the flow file.
+
+### Deploying with the Admin API
+
+`POST /flows` with the default header `Node-RED-API-Version: v1` (or with that header omitted) takes a **raw JSON array**. Credentials are not separate config properties. Put them on the device node:
+
+```json
+[
+  {
+    "id": "device1",
+    "type": "roborock-device",
+    "name": "S7",
+    "protocol": "auto",
+    "pv": "1.0",
+    "rooms": "[]",
+    "credentials": {
+      "ip": "192.168.1.20",
+      "duid": "YOUR_DUID",
+      "localKey": "YOUR_LOCAL_KEY",
+      "model": "roborock.vacuum.a15"
+    }
+  }
+]
+```
+
+Node-RED copies `credentials` into the encrypted credential store and strips them from `flows.json`. `localKey` is the credential name (camelCase). A `pv` of `1.0` makes **Auto** skip the L01 hello.
+
+### Maps and numbered rooms
+
+**Read maps** calls `get_multi_maps_list` and `get_room_mapping` for the map that is currently loaded. Map names come from the robot (floor names such as `1 этаж`). Segments are stored as **Room 16**, **Room 17**, and so on. **Load** sends `load_multi_map` and switches the robot onto that floor, then reads segments again.
+
+Rooms that were never given names in the app often produce an empty `get_room_mapping` for that map. The editor says **no segments returned for the current map** and includes `lab_status` / `unsave_map_flag` when the status has them. Type segment ids yourself, one per line (`16` or `16 Hall`). Cloud home entries such as old default room labels are not segment ids and are not used.
+
+```json
+{"command":"rooms","segments":[16]}
+{"command":"rooms","names":["Room 16"]}
+{"command":"maps"}
+{"command":"map","mapFlag":1}
+```
+
+`names:["16"]` is segment 16 even before you press Read maps.
 
 ### When the key stops working
 
@@ -60,7 +104,9 @@ After that, the vacuum node does not contact Roborock's cloud.
 | `{"command":"fan","speed":"turbo"}` | `set_custom_mode` |
 | `{"command":"mop","intensity":"low"}` | `set_water_box_custom_mode` |
 | `{"command":"rooms","segments":[16,17],"repeat":1}` | `app_segment_clean` |
-| `{"command":"rooms","names":["Kitchen"]}` | segment clean, after room matching |
+| `{"command":"rooms","names":["Room 16"]}` | segment 16 (`16` or `Room 16` also work) |
+| `{"command":"maps"}` | `get_multi_maps_list` |
+| `{"command":"map","mapFlag":1}` | `load_multi_map` (switches floor) |
 | `{"command":"zone","zones":[[x1,y1,x2,y2,1]]}` | `app_zoned_clean` |
 | `{"method":"get_consumable","params":[]}` | that method, unchanged |
 
@@ -102,7 +148,10 @@ With neither `--code` nor `--password`, it sends a code and asks for it on the t
 - **Nothing on port 54321.** Expected on current S7 firmware. This node uses TCP 58867 only.
 - **Handshake timeout.** The Node-RED host cannot open TCP 58867 to the robot (VLAN, guest Wi-Fi, firewall). Confirm with `nc -vz <ip> 58867`.
 - **Decrypt failed / RPC timeout after a successful socket connect.** The `local_key` does not match this robot anymore. Fetch it again.
-- **Find on LAN hears nothing.** The robot broadcasts on UDP 58866 only now and then, and another integration may already bind that port. Type the IP. Discovery is optional.
+- **Find on LAN hears nothing.** The robot broadcasts on UDP 58866 only now and then. The button listens for about 8 seconds. Type the IP if nothing arrives. Discovery is optional.
+- **UDP 58866 already in use (EADDRINUSE).** Another program on this same machine, often Home Assistant's Roborock integration, already bound that port. Discovery works when Home Assistant is not on this host. Type the IP, or stop the other listener and try again.
+- **No segments returned for the current map.** `get_room_mapping` only lists the loaded map, and an S7 with numbered, unnamed rooms can return `[]` even though `get_multi_maps_list` has floor names. Load the other map, or type segment ids. Do not treat cloud home room names as segment ids.
+- **`No CONNACK for L01`.** This firmware speaks protocol 1.0. Leave protocol on Auto and keep `pv` at `1.0` (filled from the account), or set the protocol dropdown to 1.0. Auto then does not wait on an L01 hello. Forced L01 still reports this error.
 - **Auto-detect region fails.** Pick Russia / Europe / US / China. The URL must be `https://*.roborock.com`.
 - **Code 2018.** The email code was wrong or expired. Send another.
 - **Code 3009 / 3006.** Open the Roborock app and accept the user agreement. Mi Home accounts are not Roborock accounts.
@@ -125,7 +174,7 @@ GitHub Actions runs lint and tests on Node 18, 20, and 22. Publishing to npm is 
 
 Local control is a length-prefixed TCP session on port 58867:
 
-- **CONNECT / CONNACK** negotiate the session. The implementation sends the app-style connect (protocol 0, 4-byte keepalive, no CRC) and, if the robot stays silent, the python-roborock hello.
+- **CONNECT / CONNACK** negotiate the session. The implementation sends the app-style connect (protocol 0, 4-byte keepalive, no CRC) and, if the robot stays silent, the python-roborock hello. Auto tries 1.0 and then L01, except when the account protocol `pv` is `1.0`, in which case L01 is not attempted.
 - **PUBLISH** (protocol 4) carries AES-encrypted JSON. Version `1.0` is AES-128-ECB with `MD5(scrambled timestamp + local_key + salt)`. Version `L01` is AES-256-GCM. A CRC32 covers the frame.
 - The JSON envelope is `{"dps":{"101":"<rpc>"},"t":<unix>}` and the reply comes back on dps `102` with a matching `id`.
 
@@ -140,8 +189,9 @@ The protocol behavior was reimplemented from public documentation and the Apache
 1. Поставьте пакет, перезапустите Node-RED.
 2. В конфиге **roborock device** укажите почту аккаунта Roborock. Для региона RU оставьте автоопределение или выберите Russia (`https://ruiot.roborock.com`).
 3. **Send code**, введите код из письма, войдите. Выберите пылесос.
-4. IP часто не приходит из облака: нажмите **Find on LAN** или впишите адрес вручную. Deploy.
-5. Команды: `start`, `pause`, `stop`, `dock`, `find`, `status`, либо объект `{command:"fan", speed:"turbo"}` и `{command:"rooms", segments:[16]}`.
+4. IP часто не приходит из облака: нажмите **Find on LAN** или впишите адрес вручную. Если UDP 58866 занят (часто Home Assistant на этой же машине), впишите IP. Deploy.
+5. Команды: `start`, `pause`, `stop`, `dock`, `find`, `status`, либо объект `{command:"fan", speed:"turbo"}` и `{command:"rooms", segments:[16]}`. Карты этажей: **Read maps** (`get_multi_maps_list`). Комнаты без имён — это номера сегментов, «Room 16». Имена комнат из облака не используются.
+6. Сессию из Home Assistant можно вставить как `user_data` (кнопка **Import session**) вместо кода из почты. IP, DUID, `localKey` и model хранятся в credentials, не в JSON потока.
 
 `local_key` меняется после сброса Wi-Fi или повторного добавления робота в приложение. Тогда снова нажмите получение устройств и сделайте Deploy. Если команды висят по таймауту, проверьте что с машины Node-RED открывается TCP 58867 и что ключ не устарел.
 

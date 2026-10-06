@@ -31,7 +31,14 @@
         <input type="password" id="rr-account-password" placeholder="password (optional)" style="width:50%" autocomplete="new-password">
         <button type="button" class="red-ui-button" id="rr-account-pass-login">Log in with password</button>
     </div>
-    <div class="form-tips" id="rr-account-status">Sign in once so a Roborock device node can download DUID and local_key. The password and session stay in Node-RED credentials, not in the flow file.</div>
+    <div class="form-row">
+        <label for="rr-account-import"><i class="fa fa-paste"></i> Existing session</label>
+        <textarea id="rr-account-import" rows="3" style="width:70%" placeholder="Paste Home Assistant user_data JSON" autocomplete="off"></textarea>
+    </div>
+    <div class="form-row">
+        <button type="button" class="red-ui-button" id="rr-account-import-btn">Import session</button>
+    </div>
+    <div class="form-tips" id="rr-account-status">Sign in once, or paste an existing session, so a Roborock device node can download DUID and local_key. The session stays in Node-RED credentials, not in the flow file, and is not written to the log.</div>
     <input type="password" id="node-config-input-userData" style="display:none" autocomplete="off">
     <input type="hidden" id="node-config-input-clientId">
 </script>
@@ -42,8 +49,10 @@
     <ol>
         <li>Enter the email address from the Roborock app. Pick Russia, Europe, US, or China if auto-detect fails. Russia is <code>https://ruiot.roborock.com</code>.</li>
         <li>Click <b>Send code</b>, then enter the code from the email. Password login is also available for older accounts.</li>
+        <li>Or paste <code>user_data</code> from Home Assistant (<code>.storage/core.config_entries</code>, the roborock entry) and click <b>Import session</b>. Include <code>base_url</code> by pasting the whole entry when you can. The JSON is validated and not logged.</li>
         <li>Deploy. Then open a Roborock device node and click <b>Fetch devices</b>.</li>
     </ol>
+    <p>IP, DUID, <code>localKey</code>, and model live on the device node's credentials, not in this account node and not in the flow file.</p>
     <h3>When the key changes</h3>
     <p><code>local_key</code> changes after the robot is removed and added again, or after a Wi-Fi reset. Sign in and fetch devices again, then deploy. Commands that time out or fail to decrypt usually mean the stored key is stale.</p>
     <p>This package is unofficial and is not affiliated with Roborock.</p>
@@ -100,6 +109,9 @@
                     node._sessionUserData = data.userData;
                     $("#node-config-input-userData").val(JSON.stringify(data.userData));
                 }
+                if (data.email && !$("#node-config-input-email").val()) {
+                    $("#node-config-input-email").val(data.email);
+                }
             }
             $("#rr-account-send").on("click", function () {
                 setStatus("Requesting a verification code...");
@@ -119,6 +131,19 @@
                     })
                     .fail(function (xhr) {
                         setStatus((xhr.responseJSON && xhr.responseJSON.error) || "Login failed", true);
+                    });
+            });
+            $("#rr-account-import-btn").on("click", function () {
+                const pasted = $("#rr-account-import").val();
+                setStatus("Checking the imported session...");
+                postJSON("roborock-local/import-session", Object.assign(payload(), { userData: pasted }))
+                    .done(function (data) {
+                        $("#rr-account-import").val("");
+                        remember(data);
+                        setStatus((data.message || "Session imported.") + " Deploy, then fetch devices from a Roborock device node.");
+                    })
+                    .fail(function (xhr) {
+                        setStatus((xhr.responseJSON && xhr.responseJSON.error) || "Could not import that session", true);
                     });
             });
             $("#rr-account-pass-login").on("click", function () {

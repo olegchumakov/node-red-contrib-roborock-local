@@ -161,6 +161,7 @@ describe("commands and status", () => {
             { segments: [16, 17], repeat: 2 }
         ]);
         assert.equal(resolveCommand({ method: "get_consumable", params: [] }).method, "get_consumable");
+        assert.deepEqual(resolveCommand({ command: "map", id: 0 }).params, [[0]]);
         assert.throws(() => resolveCommand(""), /No command/);
     });
 

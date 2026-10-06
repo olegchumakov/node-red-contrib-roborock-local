@@ -1,7 +1,7 @@
 "use strict";
 
 const sessionPool = require("../lib/session");
-const { resolveCommand } = require("../lib/commands");
+const { resolveCommand, segmentIdForName } = require("../lib/commands");
 const { statusColor, statusText, sameStatus, normalizeStatus } = require("../lib/status");
 
 module.exports = function (RED) {
@@ -24,6 +24,7 @@ module.exports = function (RED) {
                 localKey: device.localKey,
                 duid: device.duid,
                 protocol: device.protocol,
+                knownProtocol: device.pv,
                 helloTimeoutMs: device.helloTimeoutMs,
                 requestTimeoutMs: device.requestTimeoutMs,
                 pingIntervalMs: device.pingIntervalMs,
@@ -133,16 +134,7 @@ function withNamedRooms(payload, device) {
     if (payload.segments || payload.rooms || payload.ids) {
         return payload;
     }
-    const ids = payload.names.map((name) => {
-        const match = (device.rooms || []).find((room) => {
-            return String(room.name || "").trim().toLowerCase() === String(name).trim().toLowerCase()
-                && room.segmentId !== undefined;
-        });
-        if (!match) {
-            throw new Error(`No segment id stored for room "${name}". Match rooms on the device config, or pass segment ids.`);
-        }
-        return match.segmentId;
-    });
+    const ids = payload.names.map((name) => segmentIdForName(name, device.rooms));
     return { ...payload, segments: ids };
 }
 
