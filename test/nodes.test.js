@@ -8,8 +8,13 @@ const path = require("path");
 const helper = require("node-red-node-test-helper");
 const { startMock } = require("./mock-vacuum");
 const { resetForTests } = require("../lib/session");
+const { setDevicesLoaderForTests, clearEditorSessions } = require("../lib/admin");
+const { rememberEditorSession, readEditorSession } = require("../lib/editor-sessions");
+const deviceModule = require("../nodes/roborock-device.js");
 
+let runtimeRED;
 const register = (RED) => {
+    runtimeRED = RED;
     require("../nodes/roborock-account.js")(RED);
     require("../nodes/roborock-device.js")(RED);
     require("../nodes/roborock-vacuum.js")(RED);
@@ -33,7 +38,12 @@ describe("node-red nodes", () => {
         resetForTests();
         await helper.unload();
     });
-    beforeEach(() => resetForTests());
+    beforeEach(() => {
+        resetForTests();
+        deviceModule.resetLegacySessionHintsForTests();
+        setDevicesLoaderForTests(null);
+        clearEditorSessions();
+    });
 
     test("vacuum node commands a mocked device and keeps the key out of the example flow", async () => {
         const example = fs.readFileSync(path.join(__dirname, "../examples/roborock-local.json"), "utf8");
@@ -176,6 +186,208 @@ describe("node-red nodes", () => {
         } finally {
             await mock.close();
         }
+    });
+
+    test("load map sends a numeric mapFlag, not a nested array", async () => {
+        const mock = await startMock((rpc) => {
+            if (rpc.method === "get_status") {
+                return [{ state: 8, battery: 100, error_code: 0, map_status: 11 }];
+            }
+            if (rpc.method === "get_multi_maps_list") {
+                return [{
+                    map_info: [
+                        { mapFlag: 1, name: "2 этаж" },
+                        { mapFlag: 2, name: "1 этаж" }
+                    ]
+                }];
+            }
+            if (rpc.method === "get_room_mapping") {
+                return [];
+            }
+            return ["ok"];
+        });
+        try {
+            await helper.load(register, [
+                {
+                    id: "dev1",
+                    type: "roborock-device",
+                    name: "S7",
+                    protocol: "1.0",
+                    pv: "1.0",
+                    rooms: "[]",
+                    port: mock.port,
+                    pingIntervalMs: 0,
+                    helloTimeoutMs: 1000,
+                    requestTimeoutMs: 1000
+                }
+            ], {
+                dev1: {
+                    ip: "127.0.0.1",
+                    duid: "DUID1",
+                    localKey: "testlocalkey1234",
+                    model: "roborock.vacuum.a15"
+                }
+            });
+            const response = await helper.request()
+                .post("/roborock-local/map-rooms")
+                .send({
+                    nodeId: "dev1",
+                    ip: "127.0.0.1",
+                    localKey: "testlocalkey1234",
+                    pv: "1.0",
+                    protocol: "1.0",
+                    action: "load",
+                    mapFlag: "1"
+                });
+            assert.equal(response.status, 200);
+            assert.equal(response.body.ok, true);
+            const loadCall = mock.requests.find((rpc) => rpc.method === "load_multi_map");
+            assert.ok(loadCall);
+            assert.deepEqual(loadCall.params, [1]);
+            assert.equal(typeof loadCall.params[0], "number");
+            assert.equal(Array.isArray(loadCall.params[0]), false);
+            assert.match(response.body.warning, /no rooms split/);
+        } finally {
+            await mock.close();
+        }
+    });
+
+    test("a device with a leftover cloud session still runs without an account", async () => {
+        const mock = await startMock();
+        const secret = "leftover-session-token";
+        try {
+            await helper.load(register, [
+                {
+                    id: "dev1",
+                    type: "roborock-device",
+                    name: "S7",
+                    protocol: "1.0",
+                    pv: "1.0",
+                    rooms: "[]",
+                    port: mock.port,
+                    pingIntervalMs: 0,
+                    helloTimeoutMs: 1000,
+                    requestTimeoutMs: 1000
+                },
+                { id: "n1", type: "roborock-vacuum", name: "vacuum", device: "dev1", pollInterval: 0, statusOnChange: true, wires: [["h1"], ["h2"]] },
+                { id: "h1", type: "helper" },
+                { id: "h2", type: "helper" }
+            ], {
+                dev1: {
+                    ip: "127.0.0.1",
+                    duid: "DUID1",
+                    localKey: "testlocalkey1234",
+                    model: "roborock.vacuum.a15",
+                    email: "user@example.com",
+                    userData: JSON.stringify({ token: secret })
+                }
+            });
+            const device = helper.getNode("dev1");
+            assert.equal(device.ip, "127.0.0.1");
+            assert.equal(device.localKey, "testlocalkey1234");
+            assert.equal(device.account, undefined);
+            const n1 = helper.getNode("n1");
+            const h1 = helper.getNode("h1");
+            const result = new Promise((resolve, reject) => {
+                const timer = setTimeout(() => reject(new Error("no command result")), 8000);
+                h1.on("input", (msg) => {
+                    clearTimeout(timer);
+                    resolve(msg);
+                });
+            });
+            n1.receive({ payload: "status" });
+            const msg = await result;
+            assert.equal(msg.method, "get_status");
+            const logged = helper.log().getCalls().map((call) => JSON.stringify(call.args)).join("\n");
+            assert.match(logged, /roborock account/);
+            assert.equal(logged.includes(secret), false);
+            assert.equal(logged.includes("user@example.com"), false);
+        } finally {
+            await mock.close();
+        }
+    });
+
+    test("fetch devices uses the editor session cache before the account is deployed", async () => {
+        await helper.load(register, []);
+        const secret = "editor-cache-token";
+        rememberEditorSession("account-unsaved", {
+            email: "user@example.com",
+            userData: { token: secret, rriot: { u: "u" } }
+        });
+        setDevicesLoaderForTests(async (source) => {
+            assert.equal(source.userData.token, secret);
+            return {
+                rooms: [],
+                devices: [{ duid: "D1", name: "S7", model: "roborock.vacuum.a15", localKey: "device-key", pv: "1.0" }]
+            };
+        });
+        const response = await helper.request()
+            .post("/roborock-local/devices")
+            .send({ nodeId: "account-unsaved", discover: false });
+        assert.equal(response.status, 200);
+        assert.equal(response.body.ok, true);
+        assert.equal(response.body.devices[0].duid, "D1");
+        assert.equal(JSON.stringify(response.body).includes(secret), false);
+    });
+
+    test("pending account credentials are used and a placeholder is not", async () => {
+        await helper.load(register, []);
+        rememberEditorSession("account-unsaved", {
+            userData: { token: "cached-token" }
+        });
+        setDevicesLoaderForTests(async (source) => {
+            return {
+                rooms: [],
+                devices: [{ duid: source.userData.token === "pending-token" ? "PENDING" : "CACHED", name: "S7", localKey: "k" }]
+            };
+        });
+        const pending = await helper.request()
+            .post("/roborock-local/devices")
+            .send({ nodeId: "account-unsaved", userData: { token: "pending-token" }, discover: false });
+        assert.equal(pending.status, 200);
+        assert.equal(pending.body.devices[0].duid, "PENDING");
+        assert.equal(JSON.stringify(pending.body).includes("pending-token"), false);
+        const placeholder = await helper.request()
+            .post("/roborock-local/devices")
+            .send({ nodeId: "account-unsaved", userData: "__PWRD__", discover: false });
+        assert.equal(placeholder.status, 200);
+        assert.equal(placeholder.body.devices[0].duid, "CACHED");
+        assert.equal(JSON.stringify(placeholder.body).includes("cached-token"), false);
+    });
+
+    test("fetch devices without a session tells you to sign in on the account", async () => {
+        await helper.load(register, []);
+        const response = await helper.request()
+            .post("/roborock-local/devices")
+            .send({ nodeId: "not-deployed", token: "super-secret-token" });
+        assert.equal(response.status, 401);
+        assert.match(response.body.error, /roborock account/);
+        assert.match(response.body.error, /Deploy is not required/);
+        assert.equal(JSON.stringify(response.body).includes("super-secret-token"), false);
+    });
+
+    test("deploy clears the editor session cache", async () => {
+        await helper.load(register, []);
+        rememberEditorSession("account-unsaved", { userData: { token: "cached-token" } });
+        assert.ok(readEditorSession("account-unsaved"));
+        runtimeRED.events.emit("flows:started", {});
+        assert.equal(readEditorSession("account-unsaved"), null);
+    });
+
+    test("the device editor has no login form and maps are optional", () => {
+        const deviceHtml = fs.readFileSync(path.join(__dirname, "../nodes/roborock-device.html"), "utf8");
+        const accountHtml = fs.readFileSync(path.join(__dirname, "../nodes/roborock-account.html"), "utf8");
+        assert.equal(deviceHtml.includes("rr-manual-segments"), false);
+        assert.equal(deviceHtml.includes("rr-send-code"), false);
+        assert.equal(deviceHtml.includes("RED.notify"), false);
+        assert.match(deviceHtml, /Maps &amp; rooms \(optional\)/);
+        assert.match(deviceHtml, /no rooms split/);
+        const creds = deviceHtml.slice(deviceHtml.lastIndexOf("credentials:"), deviceHtml.indexOf("label:"));
+        assert.equal(creds.includes("userData"), false);
+        assert.equal(creds.includes("email"), false);
+        assert.match(accountHtml, /nodeId: node.id/);
+        assert.match(accountHtml, /Import Home Assistant session/);
+        assert.match(accountHtml, /rr-account-pass-login/);
     });
 
     test("admin send-code rejects a missing email", async () => {

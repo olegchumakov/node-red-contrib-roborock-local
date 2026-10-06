@@ -11,7 +11,7 @@
         "type": "comment",
         "z": "c0ffee00roborocktab",
         "name": "How to use this example",
-        "info": "1. Double-click the roborock device config (or add a roborock account, sign in with the emailed code, deploy, then fetch devices).\n2. Pick your vacuum. Find on LAN fills the IP when UDP 58866 can hear the robot.\n3. Deploy. Inject start / dock / status. Output 1 is the command result. Output 2 is status.\n\nlocal_key is stored in credentials and is intentionally absent from this example.\nThe local key changes after a Wi-Fi reset — fetch it again if commands start timing out.\n\nThis package is unofficial and is not affiliated with Roborock.",
+        "info": "1. Open the roborock device config and add a roborock account. Sign in (email code, password, or a Home Assistant session) and click Done. Do not deploy yet.\n2. Fetch devices from account and pick the vacuum. Find on LAN fills the IP when UDP 58866 can hear the robot.\n3. Done, then Deploy once. Inject start / dock / status. Output 1 is the command result. Output 2 is status.\n\nMaps and rooms are optional. An empty room list is normal when the floor has no room split.\nlocal_key is stored in credentials and is intentionally absent from this example.\nThe local key changes after a Wi-Fi reset — fetch it again if commands start timing out.\n\nThis package is unofficial and is not affiliated with Roborock.",
         "x": 260,
         "y": 80,
         "wires": []
@@ -23,8 +23,6 @@
         "account": "",
         "deviceName": "",
         "protocol": "auto",
-        "region": "auto",
-        "baseUrl": "",
         "firmware": "",
         "rooms": "[]"
     },
