@@ -52,7 +52,7 @@
     </div>
     <div id="rr-map-list" style="margin:8px 0;"></div>
     <div class="form-tips" id="rr-map-note"></div>
-    <div class="form-tips">Read-only reference. Nothing here is saved, and the robot's loaded map is not changed. Switch floors and clean rooms with vacuum commands, for example <code>{"command":"map","mapFlag":1}</code> and <code>{"command":"rooms","segments":[16]}</code>.</div>
+    <div class="form-tips"><b>Reload</b> on the loaded map re-reads its rooms and does not change the robot. <b>Load this map</b> on another floor asks first, then switches the robot, reads that floor's rooms, and keeps them for later. Nothing is written into the node config. Clean and switch from the vacuum node with <code>{"command":"rooms","segments":[16]}</code> and <code>{"command":"map","mapFlag":1}</code>.</div>
     <input type="hidden" id="node-config-input-firmware">
     <input type="hidden" id="node-config-input-pv">
 </script>
@@ -90,9 +90,10 @@
     <h3>Refreshing a key</h3>
     <p>Re-pairing or a Wi-Fi reset rotates <code>local_key</code>. Sign in on the account node if the saved session expired, fetch the device again, and deploy. Timeouts and "decrypt failed" point at a stale key or a wrong IP, not at the cloud.</p>
     <h3>Maps and rooms</h3>
-    <p><b>Show maps &amp; rooms</b> asks the robot for its floors and room ids and prints them in this dialog. It does not save anything on the node, and it does not call <code>load_multi_map</code>. The loaded floor is marked <code>(loaded)</code>.</p>
-    <p><code>get_room_mapping</code> returns segments only for the loaded map, as <code>[segmentId, cloudRoomId, tag]</code>. An empty list means that loaded map reported no rooms. Other floors are listed from <code>get_multi_maps_list</code>. When that response includes a <code>rooms</code> array, those ids are shown too. When it does not, the line is <code>rooms visible when this map is loaded</code>. Switch first with a vacuum command, then show the list again, to see that floor's segments.</p>
-    <p>A room name is shown beside an id only when it is actually tied to that segment: either <code>get_room_mapping</code> links the segment to a cloud home room id from the account session, or the map list itself sent <code>iot_name</code> on that room. Home rooms that are not linked (old names still sitting on the account) are not shown. If the account session is missing, you still get the ids.</p>
+    <p><b>Show maps &amp; rooms</b> asks the robot for its floors and room ids and prints them in this dialog. The loaded floor is marked <code>(loaded)</code> and has <b>Reload</b>, which re-reads <code>get_room_mapping</code> and cloud names and refreshes the saved copy. It does not change the robot, so it does not ask first.</p>
+    <p>Floors that are not loaded have <b>Load this map</b>. That asks for confirmation, then sends <code>load_multi_map</code> with <code>[mapFlag]</code> (a number), reads that floor's rooms, and stores them. The robot's active floor changes. It is refused while the robot is cleaning. Afterward you can switch back to the floor that was loaded before. Rooms read this way stay in the list, with <code>cached at</code> and the time, even when another floor is loaded. The copy is a file in the Node-RED user directory (<code>roborock-local-map-cache.json</code>), keyed by DUID and map id. It is not part of the flow, and saving it does not need a deploy.</p>
+    <p><code>get_room_mapping</code> returns segments only for the loaded map, as <code>[segmentId, cloudRoomId, tag]</code>. An empty list means that loaded map reported no rooms. Other floors come from <code>get_multi_maps_list</code> and from this cache. When neither has rooms, the line is <code>rooms visible when this map is loaded</code>.</p>
+    <p>A room name is shown beside an id only when it is actually tied to that segment: either <code>get_room_mapping</code> links the segment to a cloud home room id from the account session, or the map list itself sent <code>iot_name</code> on that room. Home rooms that are not linked (old names still sitting on the account) are not shown. If the account session is missing, you still get the ids. A later read can still show a name that was cached for that same segment.</p>
     <p>Control stays on the vacuum node:</p>
     <pre>{"command":"map_rooms"}
 {"command":"map","mapFlag":1}
@@ -181,6 +182,26 @@
             function segmentLabel(segment) {
                 return segment.name ? (segment.segmentId + " " + segment.name) : String(segment.segmentId);
             }
+            let mapBusy = false;
+            function cachedLabel(iso) {
+                const text = String(iso || "").replace("T", " ").replace(/\.\d+Z$/, "Z");
+                return "cached at " + (text || iso);
+            }
+            function requestBody() {
+                const key = $("#node-config-input-localKey").val();
+                const body = {
+                    ip: $("#node-config-input-ip").val(),
+                    duid: $("#node-config-input-duid").val(),
+                    protocol: $("#node-config-input-protocol").val(),
+                    pv: $("#node-config-input-pv").val(),
+                    nodeId: node.id,
+                    accountId: $("#node-config-input-account").val() || ""
+                };
+                if (key && key !== "__PWRD__") {
+                    body.localKey = key;
+                }
+                return body;
+            }
             function renderCatalog(data) {
                 const host = $("#rr-map-list").empty();
                 const maps = data.maps || [];
@@ -198,6 +219,22 @@
                     } else if (map.note) {
                         block.append($("<div class='form-tips'></div>").text(map.note));
                     }
+                    if (map.cached && map.cachedAt) {
+                        block.append($("<div class='form-tips'></div>").text(cachedLabel(map.cachedAt)));
+                    }
+                    if (map.current) {
+                        const reload = $("<button type='button' class='red-ui-button'>Reload</button>");
+                        reload.on("click", function () {
+                            showMaps("reload");
+                        });
+                        block.append(reload);
+                    } else {
+                        const load = $("<button type='button' class='red-ui-button'>Load this map</button>");
+                        load.on("click", function () {
+                            loadMap(map);
+                        });
+                        block.append(load);
+                    }
                     host.append(block);
                 });
                 if (data.loadedSegments && data.loadedSegments.length) {
@@ -209,20 +246,17 @@
                     host.append(extra);
                 }
             }
-            function showMaps() {
-                const key = $("#node-config-input-localKey").val();
-                const body = {
-                    ip: $("#node-config-input-ip").val(),
-                    duid: $("#node-config-input-duid").val(),
-                    protocol: $("#node-config-input-protocol").val(),
-                    pv: $("#node-config-input-pv").val(),
-                    nodeId: node.id,
-                    accountId: $("#node-config-input-account").val() || ""
-                };
-                if (key && key !== "__PWRD__") {
-                    body.localKey = key;
+            function showMapError(xhr, fallback) {
+                setMapNote((xhr.responseJSON && xhr.responseJSON.error) || fallback);
+            }
+            function showMaps(action) {
+                if (mapBusy) {
+                    return;
                 }
-                setMapNote("Reading maps...");
+                const body = requestBody();
+                body.action = action || "read";
+                mapBusy = true;
+                setMapNote(body.action === "reload" ? "Reloading rooms..." : "Reading maps...");
                 postJSON("roborock-local/map-rooms", body).done(function (data) {
                     renderCatalog(data);
                     if (data.mappingError) {
@@ -231,7 +265,64 @@
                         setMapNote("");
                     }
                 }).fail(function (xhr) {
-                    setMapNote((xhr.responseJSON && xhr.responseJSON.error) || "Could not read maps");
+                    showMapError(xhr, "Could not read maps");
+                }).always(function () {
+                    mapBusy = false;
+                });
+            }
+            function restoreMap(mapFlag) {
+                const body = requestBody();
+                body.action = "restore";
+                body.mapFlag = Number(mapFlag);
+                body.confirmed = true;
+                mapBusy = true;
+                setMapNote("Switching back to map " + mapFlag + "...");
+                postJSON("roborock-local/map-rooms", body).done(function (data) {
+                    renderCatalog(data);
+                    setMapNote("");
+                }).fail(function (xhr) {
+                    showMapError(xhr, "Could not switch back");
+                }).always(function () {
+                    mapBusy = false;
+                });
+            }
+            function loadMap(map) {
+                if (mapBusy) {
+                    return;
+                }
+                const name = map.name || ("map " + map.mapFlag);
+                if (!confirm("Load \"" + name + "\" (map " + map.mapFlag + ") on the robot? This changes the active floor.")) {
+                    return;
+                }
+                const body = requestBody();
+                body.action = "load";
+                body.mapFlag = Number(map.mapFlag);
+                body.confirmed = true;
+                mapBusy = true;
+                let followUp = false;
+                setMapNote("Loading map " + map.mapFlag + "...");
+                postJSON("roborock-local/map-rooms", body).done(function (data) {
+                    renderCatalog(data);
+                    if (data.mapSwitchUnconfirmed) {
+                        setMapNote("The robot was asked to load map " + map.mapFlag + ", but its status still shows another floor.");
+                    } else {
+                        setMapNote("");
+                    }
+                    const previous = data.previousMapFlag;
+                    if (previous !== null && previous !== undefined && previous !== data.currentMapFlag) {
+                        const prev = (data.maps || []).find(function (item) { return item.mapFlag === previous; });
+                        const prevName = prev && prev.name ? prev.name : ("map " + previous);
+                        if (confirm("Rooms saved for \"" + name + "\". Switch back to \"" + prevName + "\" (map " + previous + ")?")) {
+                            followUp = true;
+                            restoreMap(previous);
+                        }
+                    }
+                }).fail(function (xhr) {
+                    showMapError(xhr, "Could not load that map");
+                }).always(function () {
+                    if (!followUp) {
+                        mapBusy = false;
+                    }
                 });
             }
             function applyDevice(device) {

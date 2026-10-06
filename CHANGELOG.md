@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2
+
+- **Show maps & rooms** has **Reload** on the loaded floor. It re-reads `get_room_mapping` and cloud room names and refreshes the saved copy. It does not change the robot and does not ask for confirmation.
+- Other floors have **Load this map**. The editor asks first, then sends `load_multi_map` with `[mapFlag]` (a number), reads that floor's rooms, and can switch back to the previous floor. The load is refused while the robot is cleaning.
+- Rooms read for the loaded map (from the editor or `{"command":"map_rooms"}`) are saved per device, keyed by DUID and map id, in `roborock-local-map-cache.json` under the Node-RED user directory. No deploy is required. Later lists and `map_rooms` show those rooms for floors that are not loaded, with `cached: true` and `cachedAt`. A room name used in `{"command":"rooms","names":[...]}` resolves only against the loaded map, including that map's cache.
+
 ## 0.2.1
 
 - The device editor no longer stores a map or switches floors. **Show maps & rooms** is a read-only list (map name, `mapFlag`, room ids). Saved `rooms` and other map fields from 0.1.x / 0.2.0 are ignored and do not have to be removed.

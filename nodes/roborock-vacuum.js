@@ -3,8 +3,9 @@
 const sessionPool = require("../lib/session");
 const { resolveCommand, isMapRoomsCommand } = require("../lib/commands");
 const { statusColor, statusText, sameStatus, normalizeStatus } = require("../lib/status");
-const { readMapCatalog, resolveRoomTargets, isPlainSegmentLabel } = require("../lib/maps");
+const { readMapCatalogCached, resolveRoomTargets, isPlainSegmentLabel } = require("../lib/maps");
 const { loadCloudRooms } = require("../lib/admin");
+const { userDirFrom } = require("../lib/map-cache");
 
 module.exports = function (RED) {
     function RoborockVacuumNode(config) {
@@ -130,11 +131,7 @@ function publishStatus(node, device, status, fromCommand) {
 }
 
 async function readMapRooms(node, device, RED) {
-    const cloudRooms = await loadCloudRooms(RED, device && device.account);
-    const { catalog, status } = await readMapCatalog(
-        (method, params) => node.session.client.request(method, params),
-        cloudRooms
-    );
+    const { catalog, status } = await catalogForDevice(node, device, RED);
     if (status) {
         publishStatus(node, device, status, true);
     }
@@ -145,6 +142,16 @@ async function readMapRooms(node, device, RED) {
         status: status || null,
         device: deviceSummary(device)
     };
+}
+
+async function catalogForDevice(node, device, RED) {
+    const cloudRooms = await loadCloudRooms(RED, device && device.account);
+    return readMapCatalogCached({
+        request: (method, params) => node.session.client.request(method, params),
+        cloudRooms,
+        userDir: userDirFrom(RED),
+        duid: device && device.duid
+    });
 }
 
 async function resolveVacuumCommand(payload, node, device, RED) {
@@ -173,11 +180,7 @@ async function withNamedRooms(payload, node, device, RED) {
     }
     let catalog = null;
     if (names.some((name) => !isPlainSegmentLabel(name))) {
-        const cloudRooms = await loadCloudRooms(RED, device && device.account);
-        const read = await readMapCatalog(
-            (method, params) => node.session.client.request(method, params),
-            cloudRooms
-        );
+        const read = await catalogForDevice(node, device, RED);
         catalog = read.catalog;
         if (read.status) {
             publishStatus(node, device, read.status, true);
