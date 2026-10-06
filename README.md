@@ -16,12 +16,6 @@ From the Node-RED palette, search for `node-red-contrib-roborock-local`, or from
 npm install node-red-contrib-roborock-local
 ```
 
-Until the first npm publish, install from GitHub:
-
-```bash
-npm install olegchumakov/node-red-contrib-roborock-local
-```
-
 Restart Node-RED. Set a stable `credentialSecret` in `settings.js` **before** you deploy keys if you move the flows file between machines. Node-RED encrypts credentials with that secret; without a fixed secret, a copied flows file cannot decrypt `local_key`.
 
 ## Fetch the device key
@@ -173,7 +167,7 @@ npm run lint
 
 Tests cover the 1.0 and L01 framing against vectors from python-roborock, UDP discovery packets, the Hawk header used for home data, a fake cloud, and a fake vacuum including the Node-RED node. Nothing in CI contacts a real robot or Roborock.
 
-GitHub Actions runs lint and tests on Node 18, 20, and 22. Publishing to npm is a separate workflow on GitHub **release publish**, using the `NPM_TOKEN` secret and npm provenance. It does not publish on its own.
+GitHub Actions runs lint and tests on Node 18, 20, and 22. Publishing is a separate workflow that runs when a GitHub Release is published. It authenticates to npm with trusted publishing (OIDC), not an `NPM_TOKEN` secret. See [RELEASING.md](RELEASING.md).
 
 ## Protocol notes
 
