@@ -3,10 +3,15 @@
 const { describe, test } = require("node:test");
 const assert = require("node:assert/strict");
 const dgram = require("dgram");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
 const { RoborockClient } = require("../lib/client");
 const { discover } = require("../lib/discovery");
 const { parseImportedSession, CloudError } = require("../lib/cloud");
 const { segmentIdForName, assertReadOnlyCommand, resolveCommand, isMapRoomsCommand } = require("../lib/commands");
+const { isCleaning } = require("../lib/status");
+const { cacheFilePath, readDeviceCache, rememberLoadedRooms } = require("../lib/map-cache");
 const {
     currentMapFlag,
     normalizeMapList,
@@ -14,6 +19,7 @@ const {
     emptySegmentWarning,
     describeMaps,
     buildMapCatalog,
+    applyCachedRooms,
     resolveRoomTargets,
     ROOMS_WHEN_LOADED,
     NO_ROOM_MAPPING
@@ -137,6 +143,131 @@ describe("maps and protocol selection", () => {
         assert.equal(segments[0].segmentId, 16);
         assert.equal(segments[0].roomId, "14731399");
         assert.equal(segments[0].mapFlag, undefined);
+    });
+
+    test("cached rooms fill other floors and names resolve only on the loaded map", () => {
+        const maps = normalizeMapList([{
+            map_info: [
+                { mapFlag: 1, name: "2 этаж" },
+                { mapFlag: 2, name: "1 этаж", rooms: [{ id: 16, iot_name: "Спальня" }] }
+            ]
+        }]);
+        const catalog = buildMapCatalog({
+            maps,
+            mapping: [[20]],
+            currentMapFlag: 1,
+            cloudRooms: []
+        });
+        applyCachedRooms(catalog, {
+            1: {
+                mapFlag: 1,
+                segments: [{ segmentId: 20, name: "Kitchen" }],
+                cachedAt: "2026-10-06T12:00:00.000Z"
+            },
+            2: {
+                mapFlag: 2,
+                segments: [{ segmentId: 99, name: "Hall" }],
+                cachedAt: "2026-10-06T12:33:00.000Z"
+            }
+        });
+        assert.equal(catalog.maps[0].segments[0].name, "Kitchen");
+        assert.equal(catalog.maps[0].cached, undefined);
+        assert.equal(catalog.maps[1].cached, undefined);
+        assert.deepEqual(catalog.maps[1].segments, [{ segmentId: 16, name: "Спальня" }]);
+
+        const unread = buildMapCatalog({
+            maps: normalizeMapList([{
+                map_info: [
+                    { mapFlag: 1, name: "2 этаж" },
+                    { mapFlag: 2, name: "1 этаж" }
+                ]
+            }]),
+            mapping: [[20, "99", 12]],
+            currentMapFlag: 1,
+            cloudRooms: [{ id: "99", name: "Kitchen" }]
+        });
+        unread.maps[0].segments[0].name = "";
+        applyCachedRooms(unread, {
+            1: {
+                segments: [{ segmentId: 20, name: "Kitchen" }],
+                cachedAt: "2026-10-06T12:00:00.000Z"
+            },
+            2: {
+                segments: [
+                    { segmentId: 16, name: "Hall" },
+                    { segmentId: 17, name: "Спальня" }
+                ],
+                cachedAt: "2026-10-06T12:33:00.000Z"
+            }
+        });
+        assert.equal(unread.maps[0].segments[0].name, "Kitchen");
+        assert.equal(unread.maps[0].cached, undefined);
+        assert.equal(unread.maps[1].cached, true);
+        assert.equal(unread.maps[1].cachedAt, "2026-10-06T12:33:00.000Z");
+        assert.equal(unread.maps[1].note, undefined);
+        assert.equal(resolveRoomTargets(["Kitchen"], unread)[0], 20);
+        assert.throws(() => resolveRoomTargets(["Спальня"], unread), /not the loaded map/);
+        assert.throws(() => resolveRoomTargets(["Hall"], unread), /not the loaded map/);
+    });
+
+    test("a failed read of the loaded map uses its cache and does not wipe it", async () => {
+        const maps = normalizeMapList([{
+            map_info: [
+                { mapFlag: 1, name: "2 этаж" },
+                { mapFlag: 2, name: "1 этаж" }
+            ]
+        }]);
+        const failed = buildMapCatalog({
+            maps,
+            mapping: [],
+            currentMapFlag: 1,
+            mappingError: "mapping unavailable"
+        });
+        applyCachedRooms(failed, {
+            1: {
+                segments: [{ segmentId: 20, name: "Kitchen" }],
+                cachedAt: "2026-10-06T12:00:00.000Z"
+            }
+        });
+        assert.equal(failed.maps[0].cached, true);
+        assert.deepEqual(failed.maps[0].segments, [{ segmentId: 20, name: "Kitchen" }]);
+        assert.equal(failed.maps[0].note, undefined);
+        assert.equal(failed.maps[1].note, ROOMS_WHEN_LOADED);
+
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rr-cache-"));
+        try {
+            assert.equal(await rememberLoadedRooms(dir, "", {
+                maps: [{ current: true, mapFlag: 1, segments: [{ segmentId: 20, name: "Kitchen" }] }]
+            }), false);
+            assert.equal(fs.existsSync(cacheFilePath(dir)), false);
+            assert.equal(await rememberLoadedRooms(dir, "D1", {
+                maps: [{
+                    current: true,
+                    mapFlag: 1,
+                    name: "2 этаж",
+                    segments: [{ segmentId: 20, name: "Kitchen", roomId: "99" }]
+                }]
+            }), true);
+            const saved = readDeviceCache(dir, "D1");
+            assert.equal(saved["1"].name, "2 этаж");
+            assert.deepEqual(saved["1"].segments, [{ segmentId: 20, name: "Kitchen" }]);
+            assert.match(saved["1"].cachedAt, /^\d{4}-\d{2}-\d{2}T/);
+            assert.equal((fs.statSync(cacheFilePath(dir)).mode & 0o077), 0);
+            assert.equal(await rememberLoadedRooms(dir, "D1", {
+                mappingError: "mapping unavailable",
+                maps: [{ current: true, mapFlag: 1, segments: [], cached: true }]
+            }), false);
+            assert.deepEqual(readDeviceCache(dir, "D1")["1"].segments, [{ segmentId: 20, name: "Kitchen" }]);
+            fs.writeFileSync(cacheFilePath(dir), "{not json");
+            assert.deepEqual(readDeviceCache(dir, "D1"), {});
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+        assert.equal(isCleaning({ state: 5 }), true);
+        assert.equal(isCleaning({ state: 11 }), true);
+        assert.equal(isCleaning({ state: 8 }), false);
+        assert.equal(isCleaning({ state: 10 }), false);
+        assert.equal(isCleaning(null), false);
     });
 
     test("map_rooms is not sent as a raw robot method", () => {
