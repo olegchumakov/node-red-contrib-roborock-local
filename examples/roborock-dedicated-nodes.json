@@ -1,0 +1,400 @@
+[
+    {
+        "id": "c0ffee00rrtab2",
+        "type": "tab",
+        "label": "Roborock dedicated nodes",
+        "disabled": false,
+        "info": "Dedicated Roborock nodes sharing one device. Set up the device (account, fetch, IP) before deploying."
+    },
+    {
+        "id": "c0ffee00rrcomment02",
+        "type": "comment",
+        "z": "c0ffee00rrtab2",
+        "name": "How to use this example",
+        "info": "1. Open the roborock device config, add a roborock account, sign in, fetch the vacuum, set the IP, and click Done. Deploy once.\n2. command: start / dock. status: output 1 is the status, output 2 is events (cleaning-started, cleaning-finished, error, error-cleared, low-battery).\n3. clean rooms: after the device is deployed, open the node and use Pick rooms from the robot. The floor is stored with the rooms.\n4. consumables: checked once a day; the second output only fires for worn parts.\n\nThe universal roborock-vacuum node is still there for new or undocumented commands.\nlocal_key is stored in credentials and is not part of this example.\nThis package is unofficial and is not affiliated with Roborock.",
+        "x": 260,
+        "y": 60,
+        "wires": []
+    },
+    {
+        "id": "c0ffee00rrdevice002",
+        "type": "roborock-device",
+        "name": "My Roborock",
+        "account": "",
+        "deviceName": "",
+        "protocol": "auto",
+        "firmware": ""
+    },
+    {
+        "id": "c0ffee00rri2start",
+        "type": "inject",
+        "z": "c0ffee00rrtab2",
+        "name": "start",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "start",
+        "payloadType": "str",
+        "x": 150,
+        "y": 140,
+        "wires": [
+            [
+                "c0ffee00rrcmd2start"
+            ]
+        ]
+    },
+    {
+        "id": "c0ffee00rrcmd2start",
+        "type": "roborock-command",
+        "z": "c0ffee00rrtab2",
+        "name": "start",
+        "device": "c0ffee00rrdevice002",
+        "action": "start",
+        "x": 330,
+        "y": 140,
+        "wires": [
+            [
+                "c0ffee00rrdbg2res"
+            ]
+        ]
+    },
+    {
+        "id": "c0ffee00rri2dock",
+        "type": "inject",
+        "z": "c0ffee00rrtab2",
+        "name": "dock",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "dock",
+        "payloadType": "str",
+        "x": 150,
+        "y": 180,
+        "wires": [
+            [
+                "c0ffee00rrcmd2dock"
+            ]
+        ]
+    },
+    {
+        "id": "c0ffee00rrcmd2dock",
+        "type": "roborock-command",
+        "z": "c0ffee00rrtab2",
+        "name": "dock",
+        "device": "c0ffee00rrdevice002",
+        "action": "dock",
+        "x": 330,
+        "y": 180,
+        "wires": [
+            [
+                "c0ffee00rrdbg2res"
+            ]
+        ]
+    },
+    {
+        "id": "c0ffee00rri2turbo",
+        "type": "inject",
+        "z": "c0ffee00rrtab2",
+        "name": "turbo fan",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "str",
+        "x": 150,
+        "y": 220,
+        "wires": [
+            [
+                "c0ffee00rrset2"
+            ]
+        ]
+    },
+    {
+        "id": "c0ffee00rrset2",
+        "type": "roborock-settings",
+        "z": "c0ffee00rrtab2",
+        "name": "turbo",
+        "device": "c0ffee00rrdevice002",
+        "fan": "turbo",
+        "mop": "",
+        "x": 330,
+        "y": 220,
+        "wires": [
+            [
+                "c0ffee00rrdbg2res"
+            ]
+        ]
+    },
+    {
+        "id": "c0ffee00rri2clean",
+        "type": "inject",
+        "z": "c0ffee00rrtab2",
+        "name": "clean",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "str",
+        "x": 150,
+        "y": 260,
+        "wires": [
+            [
+                "c0ffee00rrclean2"
+            ]
+        ]
+    },
+    {
+        "id": "c0ffee00rrclean2",
+        "type": "roborock-clean-rooms",
+        "z": "c0ffee00rrtab2",
+        "name": "",
+        "device": "c0ffee00rrdevice002",
+        "segments": "",
+        "names": "",
+        "mapFlag": "",
+        "repeat": "1",
+        "fan": "",
+        "mop": "",
+        "x": 330,
+        "y": 260,
+        "wires": [
+            [
+                "c0ffee00rrdbg2res"
+            ]
+        ]
+    },
+    {
+        "id": "c0ffee00rri2maps",
+        "type": "inject",
+        "z": "c0ffee00rrtab2",
+        "name": "maps and rooms",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "str",
+        "x": 150,
+        "y": 300,
+        "wires": [
+            [
+                "c0ffee00rrmaps2"
+            ]
+        ]
+    },
+    {
+        "id": "c0ffee00rrmaps2",
+        "type": "roborock-maps",
+        "z": "c0ffee00rrtab2",
+        "name": "",
+        "device": "c0ffee00rrdevice002",
+        "action": "read",
+        "mapFlag": "",
+        "x": 330,
+        "y": 300,
+        "wires": [
+            [
+                "c0ffee00rrdbg2maps"
+            ]
+        ]
+    },
+    {
+        "id": "c0ffee00rrstatus2",
+        "type": "roborock-status",
+        "z": "c0ffee00rrtab2",
+        "name": "status",
+        "device": "c0ffee00rrdevice002",
+        "pollInterval": 30,
+        "lowBattery": 20,
+        "statusOnChange": true,
+        "x": 330,
+        "y": 380,
+        "wires": [
+            [
+                "c0ffee00rrdbg2sta"
+            ],
+            [
+                "c0ffee00rrdbg2evt"
+            ]
+        ]
+    },
+    {
+        "id": "c0ffee00rri2daily",
+        "type": "inject",
+        "z": "c0ffee00rrtab2",
+        "name": "daily",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "86400",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "str",
+        "x": 150,
+        "y": 460,
+        "wires": [
+            [
+                "c0ffee00rrcons2"
+            ]
+        ]
+    },
+    {
+        "id": "c0ffee00rrcons2",
+        "type": "roborock-consumables",
+        "z": "c0ffee00rrtab2",
+        "name": "",
+        "device": "c0ffee00rrdevice002",
+        "threshold": 10,
+        "x": 330,
+        "y": 460,
+        "wires": [
+            [
+                "c0ffee00rrdbg2cons"
+            ],
+            [
+                "c0ffee00rrdbg2worn"
+            ]
+        ]
+    },
+    {
+        "id": "c0ffee00rrdbg2res",
+        "type": "debug",
+        "z": "c0ffee00rrtab2",
+        "name": "result",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 580,
+        "y": 200,
+        "wires": []
+    },
+    {
+        "id": "c0ffee00rrdbg2maps",
+        "type": "debug",
+        "z": "c0ffee00rrtab2",
+        "name": "maps",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 580,
+        "y": 300,
+        "wires": []
+    },
+    {
+        "id": "c0ffee00rrdbg2sta",
+        "type": "debug",
+        "z": "c0ffee00rrtab2",
+        "name": "status",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 580,
+        "y": 370,
+        "wires": []
+    },
+    {
+        "id": "c0ffee00rrdbg2evt",
+        "type": "debug",
+        "z": "c0ffee00rrtab2",
+        "name": "event",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 580,
+        "y": 410,
+        "wires": []
+    },
+    {
+        "id": "c0ffee00rrdbg2cons",
+        "type": "debug",
+        "z": "c0ffee00rrtab2",
+        "name": "consumables",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 600,
+        "y": 450,
+        "wires": []
+    },
+    {
+        "id": "c0ffee00rrdbg2worn",
+        "type": "debug",
+        "z": "c0ffee00rrtab2",
+        "name": "worn parts",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 600,
+        "y": 490,
+        "wires": []
+    }
+]

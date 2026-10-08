@@ -1,0 +1,18 @@
+<script type="text/html" data-help-name="roborock-clean-rooms">
+    <p>Cleans chosen rooms, optionally on a chosen floor and with a chosen fan speed and mop level.</p>
+    <h3>Input</h3>
+    <p>Any message starts the clean using the node's settings. These override them:</p>
+    <dl class="message-properties">
+        <dt class="optional">segments <span class="property-type">array | string</span></dt>
+        <dd>Room ids, for example <code>[16, 17]</code> or <code>"16,17"</code>.</dd>
+        <dt class="optional">names <span class="property-type">array | string</span></dt>
+        <dd>Room names. A name must match exactly one room on the floor being cleaned. <code>"16"</code> and <code>"Room 16"</code> are id 16.</dd>
+        <dt class="optional">mapFlag, repeat, fan, mop</dt>
+        <dd>Floor, repeats (1-3), fan speed, mop level. The same keys work inside an object <code>msg.payload</code>. A payload that is an array is read as rooms: numbers are ids, text is names.</dd>
+    </dl>
+    <h3>Floors</h3>
+    <p>Room ids repeat between floors, so the picker stores the floor with the rooms. When the floor is set and a different one is loaded, the node loads it first and refuses if the robot is cleaning or does not switch. With the floor empty, the loaded floor is cleaned.</p>
+    <h3>Output</h3>
+    <p><code>msg.payload</code> is the robot's reply to <code>app_segment_clean</code>. <code>msg.segments</code> are the ids that were sent, and <code>msg.floorSwitched</code> says whether the floor was changed.</p>
+    <p><b>Pick rooms from the robot</b> needs the device to be deployed.</p>
+</script>

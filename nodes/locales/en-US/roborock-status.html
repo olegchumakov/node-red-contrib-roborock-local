@@ -1,0 +1,11 @@
+<script type="text/html" data-help-name="roborock-status">
+    <p>Reports what the robot is doing and tells you when that changes.</p>
+    <h3>Input</h3>
+    <p>Any message reads the status now and sends it on output 1, even if nothing changed.</p>
+    <h3>Outputs</h3>
+    <ol class="node-ports">
+        <li>Status. <code>msg.payload</code> has <code>stateName</code> (cleaning, returning, charging, idle, paused, error, ...), <code>battery</code>, <code>errorName</code>, <code>fanName</code>, <code>cleanAreaM2</code>. With <i>only when it changes</i> on, state, battery, error, fan and map changes are sent.</li>
+        <li>Events. <code>msg.payload</code> is the event name and <code>msg.status</code> is the status: <code>cleaning-started</code>, <code>cleaning-finished</code>, <code>error</code>, <code>error-cleared</code>, <code>low-battery</code>. <code>low-battery</code> is sent once when the level drops to the set value and again only after it has climbed above it. Events are compared against the previous sample, so the first sample after a deploy sends none.</li>
+    </ol>
+    <p>The poll interval is in seconds. Nodes that share a device share one connection, and the shortest poll interval wins.</p>
+</script>

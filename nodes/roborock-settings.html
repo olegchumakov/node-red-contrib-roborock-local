@@ -1,0 +1,67 @@
+<script type="text/html" data-template-name="roborock-settings">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="node-red:common.label.name"></span></label>
+        <input type="text" id="node-input-name" data-i18n="[placeholder]node-red:common.label.name">
+    </div>
+    <div class="form-row">
+        <label for="node-input-device"><i class="fa fa-android"></i> <span data-i18n="roborock-settings.label.device"></span></label>
+        <input type="text" id="node-input-device">
+    </div>
+    <div class="form-row">
+        <label for="node-input-fan"><i class="fa fa-snowflake-o"></i> <span data-i18n="roborock-settings.label.fan"></span></label>
+        <select id="node-input-fan">
+            <option value="" data-i18n="roborock-settings.keep"></option>
+            <option value="silent" data-i18n="roborock-settings.fan.silent"></option>
+            <option value="balanced" data-i18n="roborock-settings.fan.balanced"></option>
+            <option value="turbo" data-i18n="roborock-settings.fan.turbo"></option>
+            <option value="max" data-i18n="roborock-settings.fan.max"></option>
+            <option value="gentle" data-i18n="roborock-settings.fan.gentle"></option>
+            <option value="auto" data-i18n="roborock-settings.fan.auto"></option>
+        </select>
+    </div>
+    <div class="form-row">
+        <label for="node-input-mop"><i class="fa fa-tint"></i> <span data-i18n="roborock-settings.label.mop"></span></label>
+        <select id="node-input-mop">
+            <option value="" data-i18n="roborock-settings.keep"></option>
+            <option value="off" data-i18n="roborock-settings.mop.off"></option>
+            <option value="low" data-i18n="roborock-settings.mop.low"></option>
+            <option value="medium" data-i18n="roborock-settings.mop.medium"></option>
+            <option value="high" data-i18n="roborock-settings.mop.high"></option>
+        </select>
+    </div>
+    <div class="form-tips" data-i18n="roborock-settings.tip"></div>
+</script>
+
+<script type="text/javascript">
+    RED.nodes.registerType("roborock-settings", {
+        category: "Roborock",
+        color: "#c0392b",
+        defaults: {
+            name: { value: "" },
+            device: { value: "", type: "roborock-device", required: true },
+            fan: { value: "" },
+            mop: { value: "" }
+        },
+        inputs: 1,
+        outputs: 1,
+        outputLabels: function () { return this._("roborock-settings.output"); },
+        icon: "roborock.svg",
+        paletteLabel: "settings",
+        label: function () {
+            if (this.name) {
+                return this.name;
+            }
+            const parts = [];
+            if (this.fan) {
+                parts.push(this._("roborock-settings.fan." + this.fan));
+            }
+            if (this.mop) {
+                parts.push(this._("roborock-settings.mop." + this.mop));
+            }
+            return parts.length ? parts.join(" / ") : this._("roborock-settings.name");
+        },
+        labelStyle: function () {
+            return this.name ? "node_label_italic" : "";
+        }
+    });
+</script>

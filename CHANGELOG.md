@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- New dedicated nodes: **command**, **status**, **clean rooms**, **settings**, **maps**, and **consumables**. They share the existing **roborock device** and its one TCP connection. **vacuum** stays as the universal node for any shorthand or raw `{"method","params"}`, including new or undocumented commands.
+- **status** sends events on a second output: `cleaning-started`, `cleaning-finished`, `error`, `error-cleared`, and a one-shot `low-battery`. Any input message reads the status on demand.
+- **clean rooms** picks rooms and the floor from the robot in the editor, switches floors first when needed (refused while the robot is cleaning), and can set repeats, fan, and mop.
+- **command** only accepts plain actions, so a typo is rejected instead of being sent to the robot as an RPC method.
+- **consumables** reports percent left per wear part and has a separate output for worn parts.
+- Every node keeps the incoming message on its output (`msg.topic` and your own properties pass through). This includes **vacuum**, which used to start a new message.
+- After a failed command the node status line returns to the robot's last known state after a few seconds instead of staying red.
+- The new nodes have English and Russian editor text and help.
+- Loading a floor moved into `lib/floor.js`; the device editor behaves as before.
+
 ## 0.2.2
 
 - **Show maps & rooms** has **Reload** on the loaded floor. It re-reads `get_room_mapping` and cloud room names and refreshes the saved copy. It does not change the robot and does not ask for confirmation.

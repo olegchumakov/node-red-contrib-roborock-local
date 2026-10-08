@@ -1,0 +1,13 @@
+<script type="text/html" data-help-name="roborock-maps">
+    <p>Lists floors and room ids, or switches the active floor.</p>
+    <h3>Input</h3>
+    <dl class="message-properties">
+        <dt class="optional">action <span class="property-type">string</span></dt>
+        <dd><code>read</code> or <code>load</code>. Also read from <code>msg.payload.action</code>.</dd>
+        <dt class="optional">mapFlag <span class="property-type">number</span></dt>
+        <dd>The floor to load. Also read from <code>msg.payload.mapFlag</code>.</dd>
+    </dl>
+    <h3>Output</h3>
+    <p><code>msg.payload</code> is <code>{currentMapFlag, maps:[{name, mapFlag, current, segments:[{segmentId, name?}]}]}</code>, the same list as <b>Show maps &amp; rooms</b> on the device. Floors that are not loaded show rooms remembered earlier, with <code>cached</code> and <code>cachedAt</code>.</p>
+    <p><b>read</b> does not change the robot. <b>load</b> sends <code>load_multi_map</code>, reads the new floor's rooms and remembers them. It is refused while the robot is cleaning, and it changes the robot's active floor, so use it deliberately.</p>
+</script>

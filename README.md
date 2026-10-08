@@ -119,7 +119,39 @@ Room names come from the Roborock account home `rooms` list (`id` → `name`), u
 
 `local_key` **changes** if you remove the robot from the app and add it again, or after a Wi-Fi reset / re-pair. Symptoms: commands time out, or the node logs that decrypt failed. Sign in again on the account node, fetch the device, and deploy. The IP can change too; edit that field or run **Find on LAN**.
 
-## Vacuum node
+## Nodes
+
+All nodes use one **roborock device** (and share one TCP connection to the robot). The incoming message is kept on the way out, so `msg.topic` and your own properties pass through. Text and help are in English and Russian (Node-RED picks the editor language).
+
+| Node | Use it for |
+| --- | --- |
+| **command** | One plain action chosen in a list: start, pause, stop, dock, find, spot. A string in `msg.payload` overrides it. Unknown actions are rejected instead of being sent to the robot. |
+| **status** | Output 1: status (polled, pushed, or on demand). Output 2: events `cleaning-started`, `cleaning-finished`, `error`, `error-cleared`, `low-battery`. |
+| **clean rooms** | Pick rooms (and the floor) from the robot in the editor, set repeats, fan, and mop, and clean them. Switches to the chosen floor first. |
+| **settings** | Fan speed and mop level. |
+| **maps** | Read floors and room ids, or load a floor. |
+| **consumables** | Percent left on the main brush, side brush, filter, and sensors, with a separate output for worn parts. |
+| **vacuum** | The universal node. Any shorthand, any raw `{"method","params"}`. Use it for new or undocumented commands. |
+
+### status events
+
+`low-battery` is sent once when the level drops to the set value, and again only after it has climbed above it. Events compare each sample with the previous one, so the first sample after a deploy sends none. Any message on the input reads the status now and sends it on output 1 even if nothing changed.
+
+### clean rooms
+
+Tick rooms after **Pick rooms from the robot** (the device must be deployed). The ids and the floor are filled in. Room ids repeat between floors, so the floor is stored with the rooms. If the floor is set and another one is loaded, the node loads it first. That is refused while the robot is cleaning, and nothing is cleaned if the floor does not switch. With the floor empty, the loaded floor is cleaned. Overrides on the message: `msg.segments`, `msg.names`, `msg.mapFlag`, `msg.repeat`, `msg.fan`, `msg.mop`. A payload that is an array is read as rooms: numbers are ids, text is names.
+
+### settings
+
+`msg.fan` and `msg.mop` (or the same keys in an object payload) override the node. `silent`, `balanced`, `turbo`, `max`, `gentle`, `auto` and `off`, `low`, `medium`, `high`, or a raw number for other firmware. The values go out as one-element lists, `[103]`.
+
+### consumables
+
+Service lives follow python-roborock: main brush 300 h, side brush 200 h, filter 150 h, sensors 30 h. Parts the robot does not report are skipped. Use an inject node with a repeat for a daily check.
+
+## Vacuum node (universal)
+
+Use this node when the dedicated ones do not cover what you need, including commands that are new or undocumented. It sends whatever `msg.payload` asks for.
 
 | Input `msg.payload` | What it sends |
 | --- | --- |
@@ -199,7 +231,7 @@ npm test
 npm run lint
 ```
 
-Tests cover the 1.0 and L01 framing against vectors from python-roborock, UDP discovery packets, the Hawk header used for home data, a fake cloud, and a fake vacuum including the Node-RED node. Nothing in CI contacts a real robot or Roborock.
+Tests cover the dedicated nodes against a fake vacuum, the status events, the 1.0 and L01 framing against vectors from python-roborock, UDP discovery packets, the Hawk header used for home data, a fake cloud, and a fake vacuum including the Node-RED node. Nothing in CI contacts a real robot or Roborock.
 
 GitHub Actions runs lint and tests on Node 18, 20, and 22. Publishing is a separate workflow that runs when a GitHub Release is published. It authenticates to npm with trusted publishing (OIDC), not an `NPM_TOKEN` secret. See [RELEASING.md](RELEASING.md).
 
@@ -211,7 +243,7 @@ Local control is a length-prefixed TCP session on port 58867:
 - **PUBLISH** (protocol 4) carries AES-encrypted JSON. Version `1.0` is AES-128-ECB with `MD5(scrambled timestamp + local_key + salt)`. Version `L01` is AES-256-GCM. A CRC32 covers the frame.
 - The JSON envelope is `{"dps":{"101":"<rpc>"},"t":<unix>}` and the reply comes back on dps `102` with a matching `id`.
 
-Map downloads, B01 (some Q-series) command translation, and MQTT cloud control are not in 0.1.0. Raw `method` / `params` still go out as a 1.0 or L01 publish if the robot is already on that session.
+Map downloads, B01 (some Q-series) command translation, and MQTT cloud control are not implemented. Raw `method` / `params` still go out as a 1.0 or L01 publish if the robot is already on that session.
 
 The protocol behavior was reimplemented from public documentation and the Apache-2.0 python-roborock sources. This package does not ship that code.
 

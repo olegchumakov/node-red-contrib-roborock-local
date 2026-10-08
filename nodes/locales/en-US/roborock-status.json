@@ -1,0 +1,18 @@
+{
+    "roborock-status": {
+        "name": "robot status",
+        "label": {
+            "device": "Device",
+            "poll": "Poll",
+            "seconds": "seconds (0 = no polling)",
+            "lowBattery": "Low battery",
+            "percent": "% (0 = off)",
+            "onChange": "Send status only when it changes"
+        },
+        "outputs": {
+            "status": "status",
+            "events": "events"
+        },
+        "tip": "Output 1 is the status. Output 2 is an event: cleaning-started, cleaning-finished, error, error-cleared, low-battery. Any message on the input reads the status now."
+    }
+}

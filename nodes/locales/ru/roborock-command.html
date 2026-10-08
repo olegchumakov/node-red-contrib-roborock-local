@@ -1,0 +1,15 @@
+<script type="text/html" data-help-name="roborock-command">
+    <p>Отправляет роботу-пылесосу Roborock одно простое действие по локальной сети.</p>
+    <h3>Вход</h3>
+    <dl class="message-properties">
+        <dt class="optional">payload <span class="property-type">string</span></dt>
+        <dd>Необязательно. <code>start</code> (<code>resume</code>), <code>pause</code>, <code>stop</code>, <code>dock</code> (<code>home</code>, <code>charge</code>, <code>return</code>), <code>find</code> (<code>locate</code>), <code>spot</code>. Заменяет действие, выбранное в ноде. Всё остальное отклоняется.</dd>
+    </dl>
+    <h3>Выход</h3>
+    <dl class="message-properties">
+        <dt>payload</dt><dd>ответ робота</dd>
+        <dt>command, method</dt><dd>действие и отправленный RPC-метод</dd>
+        <dt>status</dt><dd>последнее известное состояние робота</dd>
+    </dl>
+    <p>Входящее сообщение сохраняется: <code>msg.topic</code> и ваши свойства проходят дальше. Для команд, которых здесь нет (в том числе недокументированных), используйте <b>roborock-vacuum</b>.</p>
+</script>

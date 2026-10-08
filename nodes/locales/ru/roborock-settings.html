@@ -1,0 +1,13 @@
+<script type="text/html" data-help-name="roborock-settings">
+    <p>Задаёт мощность всасывания и интенсивность мойки.</p>
+    <h3>Вход</h3>
+    <dl class="message-properties">
+        <dt class="optional">fan <span class="property-type">string | number</span></dt>
+        <dd><code>silent</code>, <code>balanced</code>, <code>turbo</code>, <code>max</code>, <code>gentle</code>, <code>auto</code> или число — код режима. Также читается из <code>msg.payload.fan</code>.</dd>
+        <dt class="optional">mop <span class="property-type">string | number</span></dt>
+        <dd><code>off</code>, <code>low</code>, <code>medium</code>, <code>high</code> или число. Также читается из <code>msg.payload.mop</code>.</dd>
+    </dl>
+    <h3>Выход</h3>
+    <p><code>msg.payload</code> — <code>{fan, mop}</code> с ответом робота для каждого заданного параметра. В <code>msg.applied</code> числовые коды, которые были отправлены.</p>
+    <p>Именованные скорости — коды S7 101–106. Старой прошивке могут понадобиться 38 / 60 / 77 / 90: передайте число.</p>
+</script>

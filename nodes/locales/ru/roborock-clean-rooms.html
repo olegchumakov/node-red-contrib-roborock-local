@@ -1,0 +1,18 @@
+<script type="text/html" data-help-name="roborock-clean-rooms">
+    <p>Убирает выбранные комнаты, при необходимости на выбранном этаже и с выбранной мощностью и мойкой.</p>
+    <h3>Вход</h3>
+    <p>Любое сообщение запускает уборку по настройкам ноды. Их заменяют:</p>
+    <dl class="message-properties">
+        <dt class="optional">segments <span class="property-type">array | string</span></dt>
+        <dd>Id комнат, например <code>[16, 17]</code> или <code>"16,17"</code>.</dd>
+        <dt class="optional">names <span class="property-type">array | string</span></dt>
+        <dd>Имена комнат. Имя должно совпасть ровно с одной комнатой на убираемом этаже. <code>"16"</code> и <code>"Room 16"</code> — это id 16.</dd>
+        <dt class="optional">mapFlag, repeat, fan, mop</dt>
+        <dd>Этаж, число повторов (1–3), мощность, мойка. Те же ключи работают внутри объекта <code>msg.payload</code>. Если payload — массив, он читается как комнаты: числа это id, текст это имена.</dd>
+    </dl>
+    <h3>Этажи</h3>
+    <p>Id комнат повторяются на разных этажах, поэтому выбор сохраняет этаж вместе с комнатами. Если этаж задан, а загружен другой, нода сначала загрузит его и откажет, если робот убирает или не переключился. Если этаж пуст, убирается загруженный.</p>
+    <h3>Выход</h3>
+    <p><code>msg.payload</code> — ответ робота на <code>app_segment_clean</code>. <code>msg.segments</code> — отправленные id, <code>msg.floorSwitched</code> — менялся ли этаж.</p>
+    <p>Кнопке <b>Выбрать комнаты с робота</b> нужно, чтобы устройство было задеплоено.</p>
+</script>

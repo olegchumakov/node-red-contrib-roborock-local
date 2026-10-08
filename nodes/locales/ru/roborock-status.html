@@ -1,0 +1,11 @@
+<script type="text/html" data-help-name="roborock-status">
+    <p>Сообщает, что делает робот, и когда это меняется.</p>
+    <h3>Вход</h3>
+    <p>Любое сообщение читает статус сейчас и отправляет его на выход 1, даже если ничего не изменилось.</p>
+    <h3>Выходы</h3>
+    <ol class="node-ports">
+        <li>Статус. В <code>msg.payload</code>: <code>stateName</code> (cleaning, returning, charging, idle, paused, error, ...), <code>battery</code>, <code>errorName</code>, <code>fanName</code>, <code>cleanAreaM2</code>. При включённом «только при изменении» отправляются смены состояния, заряда, ошибки, мощности и карты.</li>
+        <li>События. <code>msg.payload</code> — имя события, <code>msg.status</code> — статус: <code>cleaning-started</code>, <code>cleaning-finished</code>, <code>error</code>, <code>error-cleared</code>, <code>low-battery</code>. <code>low-battery</code> приходит один раз, когда заряд опускается до порога, и снова только после того как поднимется выше. События считаются по сравнению с прошлым замером, поэтому первый замер после Deploy их не даёт.</li>
+    </ol>
+    <p>Интервал опроса в секундах. Ноды одного устройства используют одно соединение, действует самый короткий интервал.</p>
+</script>

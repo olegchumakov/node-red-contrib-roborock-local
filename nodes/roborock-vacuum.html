@@ -21,11 +21,12 @@
         <input type="checkbox" id="node-input-statusOnChange" style="width:auto; margin-top:0">
         <label for="node-input-statusOnChange" style="width:auto"> Emit status only when it changes</label>
     </div>
-    <div class="form-tips">Output 1 is the command result. Output 2 is polled or pushed status. The node status line shows the state and battery. Control stays on the LAN after the key is saved.</div>
+    <div class="form-tips">Universal node: any shorthand or raw method. Dedicated nodes (command, status, clean rooms, settings, maps, consumables) cover the common cases. Output 1 is the command result. Output 2 is polled or pushed status. The node status line shows the state and battery. Control stays on the LAN after the key is saved.</div>
 </script>
 
 <script type="text/html" data-help-name="roborock-vacuum">
     <p>Controls one Roborock vacuum over the local TCP API on port <b>58867</b>. Classic miIO UDP port 54321 is not used; an S7 on current firmware does not answer it.</p>
+    <p>This is the universal node. It accepts every shorthand below and any raw <code>{"method","params"}</code>, so it also covers commands that are new or undocumented. For everyday use the dedicated nodes are easier: <b>command</b>, <b>status</b>, <b>clean rooms</b>, <b>settings</b>, <b>maps</b>, <b>consumables</b>. All of them share the same <b>roborock device</b> and one TCP connection.</p>
     <h3>Input</h3>
     <p><code>msg.payload</code> is a shorthand string or an object.</p>
     <ul>

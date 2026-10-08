@@ -1,0 +1,18 @@
+{
+    "roborock-command": {
+        "label": {
+            "device": "Устройство",
+            "action": "Действие"
+        },
+        "actions": {
+            "start": "старт / продолжить",
+            "pause": "пауза",
+            "stop": "стоп",
+            "dock": "на базу",
+            "find": "найти (сигнал)",
+            "spot": "точечная уборка"
+        },
+        "output": "результат",
+        "tip": "Одно простое действие на ноду. Строка в msg.payload (start, pause, stop, dock, find, spot) заменяет выбранное. Для всего остального используйте ноду roborock-vacuum."
+    }
+}

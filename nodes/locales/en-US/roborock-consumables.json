@@ -1,0 +1,15 @@
+{
+    "roborock-consumables": {
+        "name": "consumables",
+        "label": {
+            "device": "Device",
+            "threshold": "Warn at",
+            "percent": "% left (0 = off)"
+        },
+        "outputs": {
+            "all": "all parts",
+            "low": "worn parts"
+        },
+        "tip": "Any message on the input reads the wear parts. Output 1 has every part with hours used and percent left. Output 2 is sent only when a part is at or below the warning level."
+    }
+}

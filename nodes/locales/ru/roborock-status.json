@@ -1,0 +1,18 @@
+{
+    "roborock-status": {
+        "name": "статус робота",
+        "label": {
+            "device": "Устройство",
+            "poll": "Опрос",
+            "seconds": "секунд (0 = без опроса)",
+            "lowBattery": "Низкий заряд",
+            "percent": "% (0 = выкл.)",
+            "onChange": "Отправлять статус только при изменении"
+        },
+        "outputs": {
+            "status": "статус",
+            "events": "события"
+        },
+        "tip": "Выход 1 — статус. Выход 2 — события: cleaning-started, cleaning-finished, error, error-cleared, low-battery. Любое сообщение на входе читает статус прямо сейчас."
+    }
+}

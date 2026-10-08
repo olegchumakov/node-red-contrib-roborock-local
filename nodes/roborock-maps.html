@@ -1,0 +1,59 @@
+<script type="text/html" data-template-name="roborock-maps">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="node-red:common.label.name"></span></label>
+        <input type="text" id="node-input-name" data-i18n="[placeholder]node-red:common.label.name">
+    </div>
+    <div class="form-row">
+        <label for="node-input-device"><i class="fa fa-android"></i> <span data-i18n="roborock-maps.label.device"></span></label>
+        <input type="text" id="node-input-device">
+    </div>
+    <div class="form-row">
+        <label for="node-input-action"><i class="fa fa-map"></i> <span data-i18n="roborock-maps.label.action"></span></label>
+        <select id="node-input-action">
+            <option value="read" data-i18n="roborock-maps.actions.read"></option>
+            <option value="load" data-i18n="roborock-maps.actions.load"></option>
+        </select>
+    </div>
+    <div class="form-row" id="rr-maps-flag-row">
+        <label for="node-input-mapFlag"><i class="fa fa-hashtag"></i> <span data-i18n="roborock-maps.label.mapFlag"></span></label>
+        <input type="number" id="node-input-mapFlag" min="0" step="1" style="width:80px">
+    </div>
+    <div class="form-tips" data-i18n="roborock-maps.tip"></div>
+</script>
+
+<script type="text/javascript">
+    RED.nodes.registerType("roborock-maps", {
+        category: "Roborock",
+        color: "#c0392b",
+        defaults: {
+            name: { value: "" },
+            device: { value: "", type: "roborock-device", required: true },
+            action: { value: "read" },
+            mapFlag: { value: "", validate: function (v) { return v === "" || (!isNaN(Number(v)) && Number(v) >= 0); } }
+        },
+        inputs: 1,
+        outputs: 1,
+        outputLabels: function () { return this._("roborock-maps.output"); },
+        icon: "roborock.svg",
+        paletteLabel: "maps",
+        label: function () {
+            if (this.name) {
+                return this.name;
+            }
+            if (this.action === "load" && this.mapFlag !== "" && this.mapFlag !== undefined) {
+                return this._("roborock-maps.loadLabel", { mapFlag: this.mapFlag });
+            }
+            return this._("roborock-maps.name");
+        },
+        labelStyle: function () {
+            return this.name ? "node_label_italic" : "";
+        },
+        oneditprepare: function () {
+            const toggle = function () {
+                $("#rr-maps-flag-row").toggle($("#node-input-action").val() === "load");
+            };
+            $("#node-input-action").on("change", toggle);
+            toggle();
+        }
+    });
+</script>

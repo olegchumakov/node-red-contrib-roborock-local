@@ -1,0 +1,27 @@
+{
+    "roborock-settings": {
+        "name": "fan / mop",
+        "label": {
+            "device": "Device",
+            "fan": "Fan speed",
+            "mop": "Mop level"
+        },
+        "keep": "(do not change)",
+        "fan": {
+            "silent": "Silent",
+            "balanced": "Balanced",
+            "turbo": "Turbo",
+            "max": "Max",
+            "gentle": "Gentle",
+            "auto": "Auto"
+        },
+        "mop": {
+            "off": "Off",
+            "low": "Low",
+            "medium": "Medium",
+            "high": "High"
+        },
+        "output": "result",
+        "tip": "Set either or both. msg.fan and msg.mop (or the same keys in an object payload) override the node. Numbers are accepted for firmware with other mode codes."
+    }
+}
