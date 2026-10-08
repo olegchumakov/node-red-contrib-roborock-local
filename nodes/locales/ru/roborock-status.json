@@ -13,6 +13,6 @@
             "status": "статус",
             "events": "события"
         },
-        "tip": "Выход 1 — статус. Выход 2 — события: cleaning-started, cleaning-finished, error, error-cleared, low-battery. Любое сообщение на входе читает статус прямо сейчас."
+        "tip": "Выход 1 — статус. Выход 2 — события: cleaning-started, cleaning-finished, paused, resumed, error, error-cleared, low-battery. Любое сообщение на входе читает статус прямо сейчас."
     }
 }

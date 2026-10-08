@@ -36,7 +36,7 @@
         "noMaps": "No saved maps returned.",
         "notes": {
             "whenLoaded": "Rooms appear once this floor has been loaded. Load it with the maps node (load a floor) or Show maps & rooms on the device, then pick again.",
-            "noMapping": "This map has no room mapping.",
+            "noMapping": "This map has no room mapping. Rooms must be named in the Roborock app at least once; until then the robot reports none.",
             "unreadable": "Room mapping could not be read for this map."
         },
         "pickDevice": "Choose and deploy a device first.",

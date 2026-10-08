@@ -107,7 +107,7 @@
             function noteText(note) {
                 const known = {
                     "rooms visible when this map is loaded": "whenLoaded",
-                    "This map has no room mapping.": "noMapping",
+                    "This map has no room mapping. Rooms must be named in the Roborock app at least once; until then the robot reports none.": "noMapping",
                     "Room mapping could not be read for this map.": "unreadable"
                 };
                 return known[note] ? node._("roborock-clean-rooms.notes." + known[note]) : (note || "");

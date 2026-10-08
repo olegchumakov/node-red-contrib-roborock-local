@@ -9,5 +9,6 @@
     </dl>
     <h3>Output</h3>
     <p><code>msg.payload</code> is <code>{currentMapFlag, maps:[{name, mapFlag, current, segments:[{segmentId, name?}]}]}</code>, the same list as <b>Show maps &amp; rooms</b> on the device. Floors that are not loaded show rooms remembered earlier, with <code>cached</code> and <code>cachedAt</code>.</p>
+    <p><b>Name the rooms in the Roborock app at least once.</b> Rooms that were never named are not reported by the robot, so no rooms are listed, even on the loaded floor. Name them in the app and read again.</p>
     <p><b>read</b> does not change the robot. <b>load</b> sends <code>load_multi_map</code>, reads the new floor's rooms and remembers them. It is refused while the robot is cleaning, and it changes the robot's active floor, so use it deliberately.</p>
 </script>

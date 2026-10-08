@@ -38,7 +38,7 @@
     <div class="form-row">
         <label for="node-config-input-protocol"><i class="fa fa-exchange"></i> Protocol</label>
         <select id="node-config-input-protocol" style="width:70%">
-            <option value="auto">Auto (saved protocol, else 1.0 then L01)</option>
+            <option value="auto">Auto (remembered, else account pv, then the other)</option>
             <option value="1.0">1.0 — S7 and most robots</option>
             <option value="L01">L01</option>
         </select>
@@ -92,6 +92,7 @@
     <h3>Maps and rooms</h3>
     <p><b>Show maps &amp; rooms</b> asks the robot for its floors and room ids and prints them in this dialog. The loaded floor is marked <code>(loaded)</code> and has <b>Reload</b>, which re-reads <code>get_room_mapping</code> and cloud names and refreshes the saved copy. It does not change the robot, so it does not ask first.</p>
     <p>Floors that are not loaded have <b>Load this map</b>. That asks for confirmation, then sends <code>load_multi_map</code> with <code>[mapFlag]</code> (a number), reads that floor's rooms, and stores them. The robot's active floor changes. It is refused while the robot is cleaning. Afterward you can switch back to the floor that was loaded before. Rooms read this way stay in the list, with <code>cached at</code> and the time, even when another floor is loaded. The copy is a file in the Node-RED user directory (<code>roborock-local-map-cache.json</code>), keyed by DUID and map id. It is not part of the flow, and saving it does not need a deploy.</p>
+    <p><b>Name the rooms in the Roborock app at least once.</b> Rooms that were never named are not reported, so <code>get_room_mapping</code> returns <code>[]</code> and no rooms are listed anywhere, even on the loaded floor.</p>
     <p><code>get_room_mapping</code> returns segments only for the loaded map, as <code>[segmentId, cloudRoomId, tag]</code>. An empty list means that loaded map reported no rooms. Other floors come from <code>get_multi_maps_list</code> and from this cache. When neither has rooms, the line is <code>rooms visible when this map is loaded</code>.</p>
     <p>A room name is shown beside an id only when it is actually tied to that segment: either <code>get_room_mapping</code> links the segment to a cloud home room id from the account session, or the map list itself sent <code>iot_name</code> on that room. Home rooms that are not linked (old names still sitting on the account) are not shown. If the account session is missing, you still get the ids. A later read can still show a name that was cached for that same segment.</p>
     <p>Control stays on the vacuum node:</p>
@@ -99,7 +100,7 @@
 {"command":"map","mapFlag":1}
 {"command":"rooms","segments":[16,17]}
 {"command":"rooms","names":["Kitchen"]}</pre>
-    <p>Auto protocol uses the account <code>pv</code> when it is <code>1.0</code> and does not wait for an L01 hello. Choosing L01 still tries L01 and reports <code>No CONNACK for L01</code> if the firmware does not speak it.</p>
+    <p>Auto protocol tries the version that worked last time for this device, else the account <code>pv</code>, else 1.0, and then the other version. Some firmware reports <code>1.0</code> in the cloud but answers only L01 on the LAN, so <code>pv</code> is only a hint. The version that worked is remembered per device (a small file in the Node-RED user directory), so only the first connect pays for a failed hello. Choosing 1.0 or L01 yourself is never second-guessed and reports <code>No CONNACK</code> if the firmware does not speak it.</p>
     <p>A cloud session that was saved on this device node in an older version is ignored. Local control keeps using the IP, DUID, and local key.</p>
 </script>
 
@@ -340,7 +341,7 @@
                 if (!$("#node-config-input-name").val()) {
                     $("#node-config-input-name").val(device.name || "");
                 }
-                const protocolNote = device.pv === "1.0" ? " Protocol 1.0 from the account; auto will not try L01." : "";
+                const protocolNote = device.pv === "1.0" ? " Protocol 1.0 from the account; auto tries it first and falls back to L01." : "";
                 setStatus("Selected " + (device.name || device.duid) + ". Click Done, then Deploy once" + (device.ip ? "." : ", then set the IP or use Find on LAN.") + protocolNote);
             }
             function renderDevices(devices) {

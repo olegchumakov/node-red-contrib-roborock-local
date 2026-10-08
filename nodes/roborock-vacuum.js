@@ -19,6 +19,7 @@ module.exports = function (RED) {
         node.lastSent = null;
 
         helpers.openSession(node, device, {
+            RED,
             pollSeconds: config.pollInterval,
             onStatus: (status) => {
                 if (helpers.shouldEmitStatus(node, status)) {

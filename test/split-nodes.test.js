@@ -12,6 +12,9 @@ const { resetForTests } = require("../lib/session");
 const { setHomeLoaderForTests } = require("../lib/admin");
 const { resetMapCacheForTests } = require("../lib/map-cache");
 const { setFailureStatusMsForTests } = require("../lib/node-helpers");
+const { resetProtocolMemoryForTests, cacheFilePath: protocolCacheFile } = require("../lib/protocol-cache");
+const { setDockRetryMsForTests } = require("../nodes/roborock-command.js");
+const sessionPool = require("../lib/session");
 
 const NODE_FILES = ["account", "device", "vacuum", "command", "status", "clean-rooms", "settings", "maps", "consumables"];
 const register = (RED) => {
@@ -79,6 +82,8 @@ describe("split nodes", () => {
         resetForTests();
         setHomeLoaderForTests(null);
         resetMapCacheForTests();
+        resetProtocolMemoryForTests();
+        fs.rmSync(protocolCacheFile(path.join(os.tmpdir(), `roborock-split-${process.pid}`)), { force: true });
     });
     afterEach(async () => {
         resetForTests();
@@ -140,7 +145,8 @@ describe("split nodes", () => {
             const first = await status.next();
             assert.equal(first.payload.stateName, "charging");
             assert.equal(first.payload.battery, 80);
-            assert.equal(first.topic, "status");
+            assert.equal(first.kind, "status");
+            assert.equal(first.topic, "ask", "the incoming topic passes through");
             assert.equal(events.messages.length, 0);
 
             n1.receive({});
@@ -226,13 +232,16 @@ describe("split nodes", () => {
             const low = collect("low");
             helper.getNode("n1").receive({ topic: "daily" });
             const result = await all.next();
-            assert.equal(result.topic, "consumables");
+            assert.equal(result.kind, "consumables");
+            assert.equal(result.topic, "daily", "the incoming topic passes through");
             assert.equal(result.payload.parts.mainBrush.remainingPercent, 10);
             assert.equal(result.payload.parts.mainBrush.remainingHours, 30);
             assert.equal(result.payload.parts.filter.remainingPercent, 33);
             assert.deepEqual(result.low, ["mainBrush"]);
             const alert = await low.next();
             assert.deepEqual(alert.payload, ["mainBrush"]);
+            assert.equal(alert.kind, "consumables-low");
+            assert.equal(alert.topic, "daily");
 
             helper.getNode("n2").receive({});
             await all.next();
@@ -415,6 +424,294 @@ describe("split nodes", () => {
         }
     });
 
+    test("clean-rooms ignores a numeric, string, or boolean payload and only reads explicit rooms", async () => {
+        const state = { loaded: 1, state: 8 };
+        const mock = await twoFloorMock(state);
+        try {
+            await helper.load(register, [
+                deviceNode(mock),
+                { id: "n1", type: "roborock-clean-rooms", device: "dev1", segments: "20", names: "", mapFlag: "", repeat: "1", fan: "", mop: "", wires: [["out"]] },
+                { id: "c1", type: "catch", scope: null, uncaught: false, wires: [["err"]] },
+                { id: "out", type: "helper" },
+                { id: "err", type: "helper" }
+            ], CREDENTIALS);
+            const out = collect("out");
+            const n1 = helper.getNode("n1");
+            for (const payload of [1791403200000, 0, 5, true, false, "Kitchen", "16", null, "", { unrelated: 1 }]) {
+                n1.receive({ payload });
+                const result = await out.next();
+                assert.deepEqual(result.segments, [20], `payload ${JSON.stringify(payload)} must not replace the node's rooms`);
+            }
+            const cleans = mock.requests.filter((rpc) => rpc.method === "app_segment_clean");
+            assert.equal(cleans.length, 10);
+            for (const clean of cleans) {
+                assert.deepEqual(clean.params, [{ segments: [20], repeat: 1 }]);
+            }
+
+            n1.receive({ payload: [21] });
+            assert.deepEqual((await out.next()).segments, [21]);
+            n1.receive({ payload: { segments: [16] } });
+            assert.deepEqual((await out.next()).segments, [16]);
+            n1.receive({ payload: { rooms: [17] } });
+            assert.deepEqual((await out.next()).segments, [17]);
+            n1.receive({ rooms: [22], payload: 1791403200000 });
+            assert.deepEqual((await out.next()).segments, [22]);
+            n1.receive({ segments: [23], payload: 1791403200000 });
+            assert.deepEqual((await out.next()).segments, [23]);
+        } finally {
+            await mock.close();
+        }
+    });
+
+    test("vacuum fan and mop shorthand send one-element lists", async () => {
+        const mock = await startMock();
+        try {
+            await helper.load(register, [
+                deviceNode(mock),
+                { id: "n1", type: "roborock-vacuum", device: "dev1", pollInterval: 0, statusOnChange: true, wires: [["out"], []] },
+                { id: "out", type: "helper" }
+            ], CREDENTIALS);
+            const out = collect("out");
+            const n1 = helper.getNode("n1");
+            n1.receive({ payload: { command: "fan", speed: "turbo" } });
+            await out.next();
+            n1.receive({ payload: { command: "mop", intensity: "medium" } });
+            await out.next();
+            assert.deepEqual(mock.requests.find((rpc) => rpc.method === "set_custom_mode").params, [103]);
+            assert.deepEqual(mock.requests.find((rpc) => rpc.method === "set_water_box_custom_mode").params, [202]);
+        } finally {
+            await mock.close();
+        }
+    });
+
+    test("auto falls back to L01 when the account says 1.0, and remembers it per device", async () => {
+        const mock = await startMock(undefined, { versions: ["L01"] });
+        const device = { ...deviceNode(mock), pv: "1.0", helloTimeoutMs: 250 };
+        try {
+            await helper.load(register, [
+                device,
+                { id: "n1", type: "roborock-command", device: "dev1", action: "start", wires: [["out"]] },
+                { id: "out", type: "helper" }
+            ], { dev1: { ...CREDENTIALS.dev1, duid: "DUIDL01" } });
+            const out = collect("out");
+            helper.getNode("n1").receive({});
+            assert.equal((await out.next(10000)).method, "app_start");
+            assert.ok(mock.helloVersions.includes("1.0"), "the account's 1.0 was tried first");
+            assert.ok(mock.helloVersions.includes("L01"));
+            assert.equal(sessionPool.peek("dev1").client.version, "L01");
+            const file = JSON.parse(fs.readFileSync(protocolCacheFile(path.join(os.tmpdir(), `roborock-split-${process.pid}`)), "utf8"));
+            assert.equal(file.devices.DUIDL01, "L01");
+            assert.equal(JSON.stringify(file).includes("testlocalkey"), false);
+
+            resetForTests();
+            const before = mock.helloVersions.length;
+            await helper.unload();
+            await helper.load(register, [
+                device,
+                { id: "n1", type: "roborock-command", device: "dev1", action: "pause", wires: [["out"]] },
+                { id: "out", type: "helper" }
+            ], { dev1: { ...CREDENTIALS.dev1, duid: "DUIDL01" } });
+            const again = collect("out");
+            helper.getNode("n1").receive({});
+            assert.equal((await again.next(10000)).method, "app_pause");
+            assert.deepEqual(mock.helloVersions.slice(before).filter((version) => version === "1.0"), [], "the remembered L01 is tried first and no 1.0 hello is wasted");
+        } finally {
+            await mock.close();
+        }
+    });
+
+    test("a forced protocol is not second-guessed", async () => {
+        const mock = await startMock(undefined, { versions: ["L01"] });
+        try {
+            await helper.load(register, [
+                { ...deviceNode(mock), protocol: "1.0", helloTimeoutMs: 200 },
+                { id: "n1", type: "roborock-command", device: "dev1", action: "start", wires: [[]] }
+            ], CREDENTIALS);
+            await new Promise((resolve) => setTimeout(resolve, 1200));
+            assert.equal(mock.helloVersions.includes("L01"), false);
+            assert.ok(mock.helloVersions.includes("1.0"));
+        } finally {
+            await mock.close();
+        }
+    });
+
+    test("status and consumables keep the incoming topic; events never carry an incoming message", async () => {
+        let state = { state: 8, battery: 80, error_code: 0 };
+        const mock = await startMock((rpc) => (rpc.method === "get_status" ? [state] : undefined));
+        try {
+            await helper.load(register, [
+                deviceNode(mock),
+                { id: "n1", type: "roborock-status", device: "dev1", pollInterval: 0, statusOnChange: true, lowBattery: 0, wires: [["status"], ["events"]] },
+                { id: "status", type: "helper" },
+                { id: "events", type: "helper" }
+            ], CREDENTIALS);
+            const status = collect("status");
+            const events = collect("events");
+            const n1 = helper.getNode("n1");
+            n1.receive({ topic: "first" });
+            const first = await status.next();
+            assert.equal(first.topic, "first");
+            assert.equal(first.kind, "status");
+
+            // A background sample that changes state arrives while an on-demand read is in flight.
+            n1.receive({ topic: "ask", custom: 7 });
+            await new Promise((resolve) => setImmediate(resolve));
+            const client = sessionPool.peek("dev1").client;
+            client.emit("status", { state: 5, stateName: "cleaning", battery: 80, errorCode: 0, inCleaning: 1 });
+            const started = await events.next();
+            assert.equal(started.payload, "cleaning-started");
+            assert.equal(started.event, "cleaning-started");
+            assert.equal(started.kind, "event");
+            assert.equal("topic" in started, false, "a background event must not borrow the on-demand message");
+            assert.equal("custom" in started, false);
+            const answer = await status.next();
+            assert.equal(answer.topic, "ask");
+            assert.equal(answer.custom, 7);
+            assert.equal(answer.kind, "status");
+        } finally {
+            await mock.close();
+        }
+    });
+
+    test("overlapping on-demand reads each answer their own message and add no stray status", async () => {
+        const mock = await startMock((rpc) => (rpc.method === "get_status" ? [{ state: 8, battery: 80, error_code: 0 }] : undefined));
+        try {
+            await helper.load(register, [
+                deviceNode(mock),
+                { id: "n1", type: "roborock-status", device: "dev1", pollInterval: 0, statusOnChange: true, lowBattery: 0, wires: [["status"], ["events"]] },
+                { id: "status", type: "helper" },
+                { id: "events", type: "helper" }
+            ], CREDENTIALS);
+            const status = collect("status");
+            const n1 = helper.getNode("n1");
+            n1.receive({ topic: "a" });
+            n1.receive({ topic: "b" });
+            n1.receive({ topic: "c" });
+            const topics = [];
+            for (let index = 0; index < 3; index += 1) {
+                topics.push((await status.next()).topic);
+            }
+            assert.deepEqual(topics.sort(), ["a", "b", "c"]);
+            await new Promise((resolve) => setTimeout(resolve, 200));
+            assert.equal(status.messages.length, 0, "no extra status without a topic");
+        } finally {
+            await mock.close();
+        }
+    });
+
+    test("an error names what is missing on the device", async () => {
+        const mock = await startMock();
+        try {
+            await helper.load(register, [
+                { ...deviceNode(mock), id: "noKey" },
+                { ...deviceNode(mock), id: "noIp" },
+                { ...deviceNode(mock), id: "neither" },
+                { id: "a", type: "roborock-command", device: "noKey", action: "start", wires: [[]] },
+                { id: "b", type: "roborock-command", device: "noIp", action: "start", wires: [[]] },
+                { id: "c", type: "roborock-command", device: "neither", action: "start", wires: [[]] },
+                { id: "d", type: "roborock-command", device: "", action: "start", wires: [[]] },
+                { id: "c1", type: "catch", scope: null, uncaught: false, wires: [["err"]] },
+                { id: "err", type: "helper" }
+            ], {
+                noKey: { ip: "127.0.0.1", duid: "D" },
+                noIp: { localKey: "testlocalkey1234", duid: "D" },
+                neither: { duid: "D" }
+            });
+            const err = collect("err");
+            const expectations = { a: /missing its local key/, b: /missing its IP\b/, c: /missing its IP and local key/, d: /No roborock device is selected/ };
+            for (const [id, pattern] of Object.entries(expectations)) {
+                helper.getNode(id).receive({});
+                const failure = await err.next();
+                assert.match(failure.error.message, pattern, id);
+                assert.doesNotMatch(failure.error.message, /IP or local key/);
+            }
+            const texts = helper.getNode("a").status.args.map((call) => call[0].text).slice(-4);
+            assert.deepEqual(texts, ["set local key", "set IP", "set IP and local key", "select a device"]);
+        } finally {
+            await mock.close();
+        }
+    });
+
+    test("maps load of the floor that is already loaded sends no load_multi_map, even while cleaning", async () => {
+        const state = { loaded: 1, state: 5 };
+        const mock = await twoFloorMock(state);
+        try {
+            await helper.load(register, [
+                deviceNode(mock),
+                { id: "n1", type: "roborock-maps", device: "dev1", action: "load", mapFlag: "1", wires: [["out"]] },
+                { id: "out", type: "helper" }
+            ], CREDENTIALS);
+            const out = collect("out");
+            helper.getNode("n1").receive({});
+            const result = await out.next();
+            assert.equal(result.payload.currentMapFlag, 1);
+            assert.equal(result.payload.alreadyLoaded, true);
+            assert.equal(methods(mock).includes("load_multi_map"), false);
+        } finally {
+            await mock.close();
+        }
+    });
+
+    test("dock retries once after action locked, other actions and other errors do not", async () => {
+        setDockRetryMsForTests(80);
+        let chargeCalls = 0;
+        let alwaysLocked = false;
+        const mock = await startMock((rpc) => {
+            if (rpc.method === "app_charge") {
+                chargeCalls += 1;
+                if (alwaysLocked || chargeCalls === 1) {
+                    throw new Error("action locked (-10003)");
+                }
+            }
+            if (rpc.method === "app_start") {
+                throw new Error("action locked (-10003)");
+            }
+            if (rpc.method === "app_stop") {
+                throw new Error("something else");
+            }
+            return undefined;
+        });
+        try {
+            await helper.load(register, [
+                deviceNode(mock),
+                { id: "n1", type: "roborock-command", device: "dev1", action: "dock", wires: [["out"]] },
+                { id: "c1", type: "catch", scope: null, uncaught: false, wires: [["err"]] },
+                { id: "out", type: "helper" },
+                { id: "err", type: "helper" }
+            ], CREDENTIALS);
+            const out = collect("out");
+            const err = collect("err");
+            const n1 = helper.getNode("n1");
+            n1.receive({ topic: "go" });
+            const result = await out.next();
+            assert.equal(result.method, "app_charge");
+            assert.equal(result.retried, true);
+            assert.equal(result.topic, "go");
+            assert.equal(chargeCalls, 2);
+
+            n1.receive({});
+            const clean = await out.next();
+            assert.equal("retried" in clean, false);
+            assert.equal(chargeCalls, 3);
+
+            alwaysLocked = true;
+            n1.receive({});
+            assert.match((await err.next()).error.message, /action locked/);
+            assert.equal(chargeCalls, 5, "one retry only");
+
+            n1.receive({ payload: "start" });
+            assert.match((await err.next()).error.message, /action locked/);
+            assert.equal(mock.requests.filter((rpc) => rpc.method === "app_start").length, 1, "start is not retried");
+
+            n1.receive({ payload: "stop" });
+            assert.match((await err.next()).error.message, /something else/);
+            assert.equal(mock.requests.filter((rpc) => rpc.method === "app_stop").length, 1);
+        } finally {
+            setDockRetryMsForTests(-1);
+            await mock.close();
+        }
+    });
+
     test("a failed command shows red, then the status line returns to the robot state", async () => {
         const mock = await startMock();
         setFailureStatusMsForTests(150);
@@ -473,6 +770,28 @@ describe("package layout", () => {
                 assert.ok(exists, `${type} uses missing text key ${key}`);
             }
         }
+    });
+
+    test("the README and the help say rooms must be named in the Roborock app", () => {
+        const needle = /named in the Roborock app|Name the rooms in the Roborock app/;
+        assert.match(fs.readFileSync(path.join(root, "README.md"), "utf8"), needle);
+        assert.match(fs.readFileSync(path.join(root, "nodes/roborock-device.html"), "utf8"), needle);
+        for (const lang of ["en-US", "ru"]) {
+            for (const type of ["roborock-maps", "roborock-clean-rooms"]) {
+                const help = fs.readFileSync(path.join(root, "nodes/locales", lang, `${type}.html`), "utf8");
+                assert.match(help, lang === "ru" ? /в приложении Roborock/ : needle, `${type} ${lang} help`);
+            }
+        }
+        const picker = JSON.parse(fs.readFileSync(path.join(root, "nodes/locales/en-US/roborock-clean-rooms.json"), "utf8"));
+        assert.match(picker["roborock-clean-rooms"].notes.noMapping, needle);
+        const picker_ru = JSON.parse(fs.readFileSync(path.join(root, "nodes/locales/ru/roborock-clean-rooms.json"), "utf8"));
+        assert.match(picker_ru["roborock-clean-rooms"].notes.noMapping, /в приложении Roborock/);
+    });
+
+    test("the room picker maps the library's no-mapping note to its translation", () => {
+        const { NO_ROOM_MAPPING } = require("../lib/maps");
+        const html = fs.readFileSync(path.join(root, "nodes/roborock-clean-rooms.html"), "utf8");
+        assert.ok(html.includes(`"${NO_ROOM_MAPPING}": "noMapping"`));
     });
 
     test("the example flows only reference node types that exist and carry no secrets", () => {

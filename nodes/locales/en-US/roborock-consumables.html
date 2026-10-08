@@ -4,8 +4,8 @@
     <p>Any message triggers a read.</p>
     <h3>Outputs</h3>
     <ol class="node-ports">
-        <li>All parts. <code>msg.payload.parts</code> has <code>mainBrush</code>, <code>sideBrush</code>, <code>filter</code>, <code>sensor</code> (the ones the robot reports), each with <code>usedHours</code>, <code>remainingHours</code> and <code>remainingPercent</code>. <code>msg.payload.raw</code> is the unchanged robot reply, and <code>msg.low</code> lists the parts at or below the warning level.</li>
-        <li>Worn parts. Sent only when a part is at or below the warning level. <code>msg.payload</code> is the list of part names.</li>
+        <li>All parts. <code>msg.kind</code> is <code>consumables</code> and the incoming <code>msg.topic</code> is kept. <code>msg.payload.parts</code> has <code>mainBrush</code>, <code>sideBrush</code>, <code>filter</code>, <code>sensor</code> (the ones the robot reports), each with <code>usedHours</code>, <code>remainingHours</code> and <code>remainingPercent</code>. <code>msg.payload.raw</code> is the unchanged robot reply, and <code>msg.low</code> lists the parts at or below the warning level.</li>
+        <li>Worn parts. Sent only when a part is at or below the warning level. <code>msg.payload</code> is the list of part names and <code>msg.kind</code> is <code>consumables-low</code>.</li>
     </ol>
     <p>Service lives follow python-roborock: main brush 300 h, side brush 200 h, filter 150 h, sensors 30 h. Use an inject node with a repeat for a daily check.</p>
 </script>

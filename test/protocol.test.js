@@ -155,8 +155,12 @@ describe("commands and status", () => {
     test("shorthand and raw commands", () => {
         assert.deepEqual(resolveCommand("dock"), { label: "dock", method: "app_charge", params: [] });
         assert.deepEqual(resolveCommand("home"), { label: "home", method: "app_charge", params: [] });
-        assert.equal(resolveCommand({ command: "fan", speed: "turbo" }).params, 103);
-        assert.equal(resolveCommand({ command: "fan", speed: 38 }).params, 38);
+        assert.deepEqual(resolveCommand({ command: "fan", speed: "turbo" }).params, [103]);
+        assert.deepEqual(resolveCommand({ command: "fan", speed: 38 }).params, [38]);
+        assert.deepEqual(resolveCommand({ command: "fan", params: [101] }).params, [101]);
+        assert.deepEqual(resolveCommand({ command: "mop", intensity: "medium" }).params, [202]);
+        assert.deepEqual(resolveCommand({ command: "mop", level: 203 }).params, [203]);
+        assert.deepEqual(resolveCommand({ command: "water", params: [201] }).params, [201]);
         assert.deepEqual(resolveCommand({ command: "rooms", segments: [16, 17], repeat: 2 }).params, [
             { segments: [16, 17], repeat: 2 }
         ]);

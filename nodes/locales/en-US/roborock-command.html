@@ -10,6 +10,8 @@
         <dt>payload</dt><dd>the robot's reply</dd>
         <dt>command, method</dt><dd>the action and the RPC method that was sent</dd>
         <dt>status</dt><dd>the last known robot state</dd>
+        <dt>retried</dt><dd><code>true</code> when a locked dock was retried</dd>
     </dl>
+    <p>Right after a pause the robot can refuse <b>dock</b> with <code>action locked (-10003)</code> and accept it a few seconds later. The node waits about 12 seconds and tries once more. Other actions and other errors are not retried.</p>
     <p>The incoming message is kept, so <code>msg.topic</code> and your own properties pass through. For commands this node does not offer, including undocumented ones, use <b>roborock-vacuum</b>.</p>
 </script>

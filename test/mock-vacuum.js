@@ -7,13 +7,19 @@ const { PROTOCOL } = require("../lib/constants");
 
 const LOCAL_KEY = "testlocalkey1234";
 
-function startMock(handler) {
+/**
+ * options.versions limits which protocol versions answer the hello (others stay silent, like
+ * firmware that does not speak them). Default: any.
+ */
+function startMock(handler, options = {}) {
     const requests = [];
+    const helloVersions = [];
     const sockets = new Set();
     const server = net.createServer((socket) => {
         sockets.add(socket);
         socket.on("close", () => sockets.delete(socket));
         const decoder = new FrameDecoder();
+        const session = { version: "1.0", connectNonce: null, ackNonce: null };
         socket.on("data", (chunk) => {
             let frames = [];
             try {
@@ -23,6 +29,13 @@ function startMock(handler) {
             }
             for (const frame of frames) {
                 if (frame.kind === "control" && frame.protocol === PROTOCOL.CONNECT) {
+                    helloVersions.push(frame.version);
+                    if (options.versions && !options.versions.includes(frame.version)) {
+                        continue;
+                    }
+                    session.version = frame.version;
+                    session.connectNonce = frame.random;
+                    session.ackNonce = 424242;
                     socket.write(encodeControl({
                         version: frame.version,
                         protocol: PROTOCOL.CONNACK,
@@ -35,7 +48,7 @@ function startMock(handler) {
                 if (frame.kind !== "data") {
                     continue;
                 }
-                const plain = decryptFrame(frame, { localKey: LOCAL_KEY });
+                const plain = decryptFrame(frame, { localKey: LOCAL_KEY, connectNonce: session.connectNonce, ackNonce: session.ackNonce });
                 const decoded = decodeRpcPayload(plain);
                 requests.push(decoded.rpc);
                 let result = ["ok"];
@@ -55,7 +68,7 @@ function startMock(handler) {
                 }
                 const timestamp = 1700001111;
                 socket.write(encodeDataFrame({
-                    version: "1.0",
+                    version: session.version,
                     seq: frame.seq,
                     random: 7,
                     timestamp,
@@ -66,7 +79,9 @@ function startMock(handler) {
                         error,
                         timestamp
                     }),
-                    localKey: LOCAL_KEY
+                    localKey: LOCAL_KEY,
+                    connectNonce: session.connectNonce,
+                    ackNonce: session.ackNonce
                 }));
             }
         });
@@ -76,6 +91,7 @@ function startMock(handler) {
             resolve({
                 port: server.address().port,
                 requests,
+                helloVersions,
                 close() {
                     for (const socket of sockets) {
                         socket.destroy();

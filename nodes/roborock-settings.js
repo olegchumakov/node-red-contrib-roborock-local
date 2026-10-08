@@ -9,7 +9,7 @@ module.exports = function (RED) {
         const node = this;
         const device = RED.nodes.getNode(config.device);
 
-        helpers.openSession(node, device);
+        helpers.openSession(node, device, { RED });
 
         helpers.onInput(node, async (msg, send) => {
             const body = msg.payload && typeof msg.payload === "object" && !Array.isArray(msg.payload) ? msg.payload : {};

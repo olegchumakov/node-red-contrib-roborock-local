@@ -3,11 +3,16 @@
 const { describe, test, after } = require("node:test");
 const assert = require("node:assert/strict");
 const net = require("net");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
 const { RoborockClient } = require("../lib/client");
 const { FrameDecoder, encodeControl, encodeDataFrame, decryptFrame } = require("../lib/frame");
 const { decodeRpcPayload, encodeRpcResponse } = require("../lib/commands");
 const { PROTOCOL } = require("../lib/constants");
 const { resetForTests } = require("../lib/session");
+const { protocolMemory, resetProtocolMemoryForTests } = require("../lib/protocol-cache");
+const { startMock: startVersionMock } = require("./mock-vacuum");
 
 const LOCAL_KEY = "testlocalkey1234";
 
@@ -150,5 +155,62 @@ describe("local client", () => {
             client.close();
             await new Promise((resolve) => server.close(resolve));
         }
+    });
+
+    test("auto falls back to the other version and remembers the one that worked", async () => {
+        const memory = protocolMemory(fs.mkdtempSync(path.join(os.tmpdir(), "rr-proto-")), "DUID-A");
+        const l01 = await startVersionMock(undefined, { versions: ["L01"] });
+        const first = new RoborockClient({
+            host: "127.0.0.1",
+            port: l01.port,
+            localKey: LOCAL_KEY,
+            knownProtocol: "1.0",
+            protocolMemory: memory,
+            pingIntervalMs: 0,
+            helloTimeoutMs: 200,
+            requestTimeoutMs: 1000
+        });
+        try {
+            const status = await first.request("get_status", []);
+            assert.equal(status[0].battery, 87);
+            assert.equal(first.version, "L01");
+            assert.equal(memory.get(), "L01");
+            assert.deepEqual([...new Set(l01.helloVersions)], ["1.0", "L01"]);
+        } finally {
+            first.close();
+            await l01.close();
+        }
+
+        const v10 = await startVersionMock(undefined, { versions: ["1.0"] });
+        const second = new RoborockClient({
+            host: "127.0.0.1",
+            port: v10.port,
+            localKey: LOCAL_KEY,
+            knownProtocol: "1.0",
+            protocolMemory: memory,
+            pingIntervalMs: 0,
+            helloTimeoutMs: 200,
+            requestTimeoutMs: 1000
+        });
+        try {
+            assert.deepEqual(second.versionsToTry(), ["L01", "1.0"], "the remembered version goes first");
+            await second.request("get_status", []);
+            assert.equal(second.version, "1.0", "a stale memory falls back instead of failing");
+            assert.equal(memory.get(), "1.0");
+        } finally {
+            second.close();
+            await v10.close();
+        }
+    });
+
+    test("the protocol memory survives a restart and holds no key", () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rr-proto-"));
+        protocolMemory(dir, "DUID-B").set("L01");
+        resetProtocolMemoryForTests();
+        assert.equal(protocolMemory(dir, "DUID-B").get(), "L01");
+        assert.equal(protocolMemory(dir, "DUID-C").get(), null);
+        protocolMemory(dir, "DUID-B").set("nonsense");
+        assert.equal(protocolMemory(dir, "DUID-B").get(), "L01");
+        assert.equal(fs.readFileSync(path.join(dir, "roborock-local-protocol-cache.json"), "utf8").includes(LOCAL_KEY), false);
     });
 });

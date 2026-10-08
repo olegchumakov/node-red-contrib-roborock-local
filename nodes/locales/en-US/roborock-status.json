@@ -13,6 +13,6 @@
             "status": "status",
             "events": "events"
         },
-        "tip": "Output 1 is the status. Output 2 is an event: cleaning-started, cleaning-finished, error, error-cleared, low-battery. Any message on the input reads the status now."
+        "tip": "Output 1 is the status. Output 2 is an event: cleaning-started, cleaning-finished, paused, resumed, error, error-cleared, low-battery. Any message on the input reads the status now."
     }
 }

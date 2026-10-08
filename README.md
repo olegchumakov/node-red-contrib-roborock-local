@@ -64,9 +64,11 @@ If Home Assistant's Roborock integration is already signed in, you can skip the 
 ]
 ```
 
-Node-RED copies `credentials` into the encrypted credential store and strips them from `flows.json`. `localKey` is the credential name (camelCase). A `pv` of `1.0` makes **Auto** skip the L01 hello.
+Node-RED copies `credentials` into the encrypted credential store and strips them from `flows.json`. `localKey` is the credential name (camelCase). With **Auto**, the account's `pv` only decides which protocol is tried first. If that one does not answer, the other is tried, and the one that worked is remembered for the device (see [Protocol](#protocol-notes)).
 
 ### Maps and rooms
+
+> **Name the rooms in the Roborock app first.** The robot reports a room mapping (`get_room_mapping`) only for rooms that have been named in the Roborock app at least once. Rooms that were never named come back as `[]`, and then every rooms path shows no rooms: **maps**, `{"command":"map_rooms"}`, **Show maps & rooms**, and the room picker of **clean rooms**. This is not a connection problem. On an S8 Pro Ultra with 5 unnamed rooms the mapping was `[]`, and right after naming them in the app it returned `[[16,"1881420",14],[17,"90829",6],...]` with no reconnect. Cleaning by segment and by name then worked. Name the rooms in the app, then read again (**Reload**, or a new read from the maps node).
 
 Whole-floor cleaning (`start`, `dock`, fan, mop) does not need a map. The device editor does not store a chosen map in the flow.
 
@@ -121,12 +123,12 @@ Room names come from the Roborock account home `rooms` list (`id` → `name`), u
 
 ## Nodes
 
-All nodes use one **roborock device** (and share one TCP connection to the robot). The incoming message is kept on the way out, so `msg.topic` and your own properties pass through. Text and help are in English and Russian (Node-RED picks the editor language).
+All nodes use one **roborock device** (and share one TCP connection to the robot). The incoming message is kept on the way out, so `msg.topic` and your own properties pass through. What kind of message it is goes in `msg.kind` (`status`, `event`, `consumables`, `consumables-low`), never in `msg.topic`. Text and help are in English and Russian (Node-RED picks the editor language).
 
 | Node | Use it for |
 | --- | --- |
-| **command** | One plain action chosen in a list: start, pause, stop, dock, find, spot. A string in `msg.payload` overrides it. Unknown actions are rejected instead of being sent to the robot. |
-| **status** | Output 1: status (polled, pushed, or on demand). Output 2: events `cleaning-started`, `cleaning-finished`, `error`, `error-cleared`, `low-battery`. |
+| **command** | One plain action chosen in a list: start, pause, stop, dock, find, spot. A string in `msg.payload` overrides it. Unknown actions are rejected instead of being sent to the robot. Right after a pause the robot can refuse `dock` with `action locked (-10003)`; the node waits about 12 seconds and tries once more (`msg.retried` is `true`). |
+| **status** | Output 1: status (polled, pushed, or on demand). Output 2: events `cleaning-started`, `cleaning-finished`, `paused`, `resumed`, `error`, `error-cleared`, `low-battery`. |
 | **clean rooms** | Pick rooms (and the floor) from the robot in the editor, set repeats, fan, and mop, and clean them. Switches to the chosen floor first. |
 | **settings** | Fan speed and mop level. |
 | **maps** | Read floors and room ids, or load a floor. |
@@ -135,15 +137,21 @@ All nodes use one **roborock device** (and share one TCP connection to the robot
 
 ### status events
 
+A clean is in progress while the robot is cleaning or paused, or while its `in_cleaning` flag is set. The flag stays set while paused and while returning to the dock. It is 1 for a full clean and 3 while a segment clean is paused (any value above 0 counts). So `paused` and `resumed` are their own events, a resume is not a new `cleaning-started`, and `cleaning-finished` is sent only when the clean really ends (idle, charging, or returning with `in_cleaning` back at 0). When a sample has no `in_cleaning` (a pushed state change), the state alone decides, and the next poll corrects it. Set a poll interval so the end of a clean is seen even when no message arrives.
+
+Output 1 has `msg.kind = "status"`. Output 2 has `msg.payload` and `msg.event` set to the event name, `msg.kind = "event"`, and the status in `msg.status`. Events come from the change between two samples, not from a reply to one message, so they do not carry an incoming message. The status output does: a message on the input is answered with its own `msg.topic` and properties, and several overlapping reads each answer their own message.
+
 `low-battery` is sent once when the level drops to the set value, and again only after it has climbed above it. Events compare each sample with the previous one, so the first sample after a deploy sends none. Any message on the input reads the status now and sends it on output 1 even if nothing changed.
 
 ### clean rooms
 
-Tick rooms after **Pick rooms from the robot** (the device must be deployed). The ids and the floor are filled in. Room ids repeat between floors, so the floor is stored with the rooms. If the floor is set and another one is loaded, the node loads it first. That is refused while the robot is cleaning, and nothing is cleaned if the floor does not switch. With the floor empty, the loaded floor is cleaned. Overrides on the message: `msg.segments`, `msg.names`, `msg.mapFlag`, `msg.repeat`, `msg.fan`, `msg.mop`. A payload that is an array is read as rooms: numbers are ids, text is names.
+Tick rooms after **Pick rooms from the robot** (the device must be deployed). The ids and the floor are filled in. Room ids repeat between floors, so the floor is stored with the rooms. If the floor is set and another one is loaded, the node loads it first. That is refused while the robot is cleaning, and nothing is cleaned if the floor does not switch. With the floor empty, the loaded floor is cleaned. Overrides on the message: `msg.segments`, `msg.names`, `msg.mapFlag`, `msg.repeat`, `msg.fan`, `msg.mop`. `msg.rooms` is accepted as another name for `msg.segments`. `msg.payload` names rooms only when it says so: an array (numbers are ids, text is names) or an object with `segments`, `rooms`, or `names`. A number, string, boolean, or the default inject timestamp is ignored, so it can never replace the rooms set on the node.
+
+Loading the floor is skipped when that floor is already loaded.
 
 ### settings
 
-`msg.fan` and `msg.mop` (or the same keys in an object payload) override the node. `silent`, `balanced`, `turbo`, `max`, `gentle`, `auto` and `off`, `low`, `medium`, `high`, or a raw number for other firmware. The values go out as one-element lists, `[103]`.
+`msg.fan` and `msg.mop` (or the same keys in an object payload) override the node. `silent`, `balanced`, `turbo`, `max`, `gentle`, `auto` and `off`, `low`, `medium`, `high`, or a raw number for other firmware. The values go out as one-element lists, `[103]`, the same as the `fan` and `mop` shorthand on the vacuum node.
 
 ### consumables
 
@@ -215,8 +223,9 @@ With neither `--code` nor `--password`, it sends a code and asks for it on the t
 - **Decrypt failed / RPC timeout after a successful socket connect.** The `local_key` does not match this robot anymore. Fetch it again.
 - **Find on LAN hears nothing.** The robot broadcasts on UDP 58866 only now and then. The button listens for about 8 seconds. Type the IP if nothing arrives. Discovery is optional.
 - **UDP 58866 already in use (EADDRINUSE).** Another program on this same machine, often Home Assistant's Roborock integration, already bound that port. Discovery works when Home Assistant is not on this host. Type the IP, or stop the other listener and try again.
+- **No rooms at all, even on the loaded floor.** The rooms were probably never named in the Roborock app. Name them there once, then read again. See [Maps and rooms](#maps-and-rooms).
 - **A floor shows no rooms.** `get_room_mapping` only describes the loaded map. Another floor says `rooms visible when this map is loaded` until **Load this map** (or `{"command":"map","mapFlag":N}` followed by `{"command":"map_rooms"}`) has read it once. Later lists show that saved copy with `cached at`. Loading a map is refused while the robot is cleaning. **Reload** on the loaded floor re-reads rooms without switching. An empty mapping on the floor that is actually loaded means that floor reported no segments.
-- **`No CONNACK for L01`.** This firmware speaks protocol 1.0. Leave protocol on Auto and keep `pv` at `1.0` (filled from the account), or set the protocol dropdown to 1.0. Auto then does not wait on an L01 hello. Forced L01 still reports this error.
+- **`No CONNACK for 1.0` or `No CONNACK for L01`.** Some firmware reports `pv` 1.0 in the cloud but answers only L01 on the LAN (an S8 Pro Ultra, `roborock.vacuum.a51`, does), and many older ones answer only 1.0. Leave protocol on Auto: it tries the account's version, then the other, and remembers the one that worked, so only the first connect pays for the failed hello. A forced protocol is never second-guessed and reports this error when the firmware does not speak it.
 - **Auto-detect region fails.** Pick Russia / Europe / US / China. The URL must be `https://*.roborock.com`.
 - **Code 2018.** The email code was wrong or expired. Send another.
 - **Code 3009 / 3006.** Open the Roborock app and accept the user agreement. Mi Home accounts are not Roborock accounts.
@@ -239,7 +248,7 @@ GitHub Actions runs lint and tests on Node 18, 20, and 22. Publishing is a separ
 
 Local control is a length-prefixed TCP session on port 58867:
 
-- **CONNECT / CONNACK** negotiate the session. The implementation sends the app-style connect (protocol 0, 4-byte keepalive, no CRC) and, if the robot stays silent, the python-roborock hello. Auto tries 1.0 and then L01, except when the account protocol `pv` is `1.0`, in which case L01 is not attempted.
+- **CONNECT / CONNACK** negotiate the session. The implementation sends the app-style connect (protocol 0, 4-byte keepalive, no CRC) and, if the robot stays silent, the python-roborock hello. Auto tries the version that worked last time for this device, else the account protocol `pv`, else 1.0, and then the other version. The working version is kept in memory and in `roborock-local-protocol-cache.json` in the Node-RED user directory, keyed by DUID. The file never holds the key and is not part of the flow.
 - **PUBLISH** (protocol 4) carries AES-encrypted JSON. Version `1.0` is AES-128-ECB with `MD5(scrambled timestamp + local_key + salt)`. Version `L01` is AES-256-GCM. A CRC32 covers the frame.
 - The JSON envelope is `{"dps":{"101":"<rpc>"},"t":<unix>}` and the reply comes back on dps `102` with a matching `id`.
 

@@ -7,6 +7,7 @@ const { detectEvents } = require("../lib/events");
 const { normalizeConsumables, lowParts } = require("../lib/consumables");
 const { resolveAction } = require("../lib/actions");
 
+const paused = () => status({ state: 10, inCleaning: 1 });
 const status = (fields) => ({ state: 8, battery: 80, errorCode: 0, ...fields });
 
 describe("status events", () => {
@@ -19,6 +20,33 @@ describe("status events", () => {
         assert.deepEqual(detectEvents(status({ state: 5 }), status({ state: 6 })), ["cleaning-finished"]);
         assert.deepEqual(detectEvents(status({ state: 5 }), status({ state: 18 })), []);
         assert.deepEqual(detectEvents(status({ state: 5 }), status({ state: 8 })), ["cleaning-finished"]);
+    });
+
+    test("a pause is not the end of a clean, and a resume is not a new start", () => {
+        const cleaning = status({ state: 5, inCleaning: 1 });
+        const paused = status({ state: 10, inCleaning: 1 });
+        assert.deepEqual(detectEvents(cleaning, paused), ["paused"]);
+        assert.deepEqual(detectEvents(paused, cleaning), ["resumed"]);
+        assert.deepEqual(detectEvents(status({ state: 8, inCleaning: 0 }), cleaning), ["cleaning-started"]);
+    });
+
+    test("a paused segment clean keeps in_cleaning=3 and is still one clean", () => {
+        const segment = status({ state: 18, inCleaning: 3 });
+        const pausedSegment = status({ state: 10, inCleaning: 3 });
+        assert.deepEqual(detectEvents(segment, pausedSegment), ["paused"]);
+        assert.deepEqual(detectEvents(pausedSegment, segment), ["resumed"]);
+        assert.deepEqual(detectEvents(pausedSegment, status({ state: 6, inCleaning: 3 })), []);
+        assert.deepEqual(detectEvents(status({ state: 6, inCleaning: 3 }), status({ state: 8, inCleaning: 0 })), ["cleaning-finished"]);
+    });
+
+    test("returning with in_cleaning set is not finished until the clean really ends", () => {
+        const cleaning = status({ state: 5, inCleaning: 1 });
+        const returning = status({ state: 6, inCleaning: 1 });
+        assert.deepEqual(detectEvents(cleaning, returning), []);
+        assert.deepEqual(detectEvents(returning, status({ state: 8, inCleaning: 0 })), ["cleaning-finished"]);
+        assert.deepEqual(detectEvents(paused(), status({ state: 3, inCleaning: 0 })), ["cleaning-finished"]);
+        assert.deepEqual(detectEvents(paused(), status({ state: 6, inCleaning: 1 })), []);
+        assert.deepEqual(detectEvents(status({ state: 8, inCleaning: 1 }), status({ state: 5, inCleaning: 1 })), []);
     });
 
     test("an error that stops a clean is an error, not a finish", () => {

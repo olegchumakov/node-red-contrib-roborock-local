@@ -10,7 +10,15 @@
 - Every node keeps the incoming message on its output (`msg.topic` and your own properties pass through). This includes **vacuum**, which used to start a new message.
 - After a failed command the node status line returns to the robot's last known state after a few seconds instead of staying red.
 - The new nodes have English and Russian editor text and help.
-- Loading a floor moved into `lib/floor.js`; the device editor behaves as before.
+- Loading a floor moved into `lib/floor.js`; the device editor behaves as before. A floor that is already loaded is only re-read: `load_multi_map` is not sent.
+- Auto protocol no longer trusts the account's `pv`. It tries the version that worked last time, else the account `pv`, else 1.0, and then the other one, and remembers the working version per device in `roborock-local-protocol-cache.json` in the Node-RED user directory. Some firmware (an S8 Pro Ultra, `roborock.vacuum.a51`) reports 1.0 in the cloud but answers only L01 on the LAN. A forced protocol is not second-guessed.
+- The `fan` and `mop` shorthand on **vacuum** now send one-element lists (`[103]`, `[202]`), as the settings and clean rooms nodes do. A bare number was ignored for fan and refused for mop (`Params is not an Array (-10007)`).
+- **clean rooms**: `msg.payload` names rooms only when it is an array or an object with `segments`, `rooms`, or `names`. A number, string, or boolean (such as the default inject timestamp) can no longer replace the rooms set on the node. `msg.rooms` is accepted as another name for `msg.segments`.
+- **status** and **consumables** keep the incoming `msg.topic`. What the message is goes in `msg.kind` (`status`, `event`, `consumables`, `consumables-low`); events also have `msg.event`. Events never carry an incoming message, and overlapping on-demand reads each answer their own message.
+- **status** events follow the robot's `in_cleaning` flag. A pause is `paused`, a resume is `resumed` (not a new `cleaning-started`), and `cleaning-finished` is sent only when the clean really ends, not on a pause or while returning with `in_cleaning` still set.
+- **command**: a `dock` refused as `action locked (-10003)` (right after a pause) is retried once after about 12 seconds; `msg.retried` is `true`.
+- Errors say what is missing on the device (IP, local key, both, or no device selected), and so does the node status line.
+- Documented: rooms must be named in the Roborock app at least once, otherwise `get_room_mapping` is `[]` and no rooms are listed. The room picker's no-rooms note says so too.
 
 ## 0.2.2
 

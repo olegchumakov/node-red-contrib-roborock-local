@@ -13,11 +13,10 @@ module.exports = function (RED) {
         const node = this;
         const device = RED.nodes.getNode(config.device);
 
-        helpers.openSession(node, device);
+        helpers.openSession(node, device, { RED });
 
         helpers.onInput(node, async (msg, send) => {
-            const body = plainObject(msg.payload) ? msg.payload : {};
-            const sources = [msg, withListPayload(msg.payload, body), config];
+            const sources = [msg, payloadSource(msg.payload), config];
             const target = pickTargets(sources);
             if (!target.segments.length && !target.names.length) {
                 throw new Error("No rooms to clean. Pick rooms on the node, or send msg.segments / msg.names.");
@@ -100,15 +99,16 @@ function plainObject(value) {
     return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-/** A payload that is an array or a single number/string is read as rooms: numbers are segment ids, text is a room name. */
-function withListPayload(payload, body) {
+/**
+ * msg.payload names rooms only when it says so: an array (numbers are segment ids, text is
+ * room names) or an object with segments / rooms / names. A number, string, boolean, or
+ * a default inject timestamp is ignored, so it can never replace the rooms set on the node.
+ */
+function payloadSource(payload) {
     if (Array.isArray(payload)) {
         return { segments: payload.filter(isNumeric), names: payload.filter((item) => !isNumeric(item)) };
     }
-    if (typeof payload === "number") {
-        return { segments: [payload] };
-    }
-    return body;
+    return plainObject(payload) ? payload : {};
 }
 
 function isNumeric(value) {
@@ -130,7 +130,7 @@ function toList(value) {
 
 function pickTargets(sources) {
     for (const source of sources) {
-        const segments = toList(source.segments).map((item) => {
+        const segments = toList(source.segments !== undefined ? source.segments : source.rooms).map((item) => {
             const id = Number(item);
             if (!Number.isInteger(id) || id < 0) {
                 throw new Error(`Room segment "${item}" is not a valid id`);
