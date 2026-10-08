@@ -1,7 +1,7 @@
 {
     "roborock-maps": {
         "name": "карты и комнаты",
-        "loadLabel": "загрузить карту {{mapFlag}}",
+        "loadLabel": "загрузить карту __mapFlag__",
         "label": {
             "device": "Устройство",
             "action": "Действие",

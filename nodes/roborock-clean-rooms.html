@@ -104,6 +104,14 @@
             function label(segment) {
                 return segment.name ? (segment.segmentId + " " + segment.name) : String(segment.segmentId);
             }
+            function noteText(note) {
+                const known = {
+                    "rooms visible when this map is loaded": "whenLoaded",
+                    "This map has no room mapping.": "noMapping",
+                    "Room mapping could not be read for this map.": "unreadable"
+                };
+                return known[note] ? node._("roborock-clean-rooms.notes." + known[note]) : (note || "");
+            }
             function render(data) {
                 const host = $("#rr-pick-list").empty();
                 const maps = data.maps || [];
@@ -117,7 +125,7 @@
                     const title = (map.name || ("Map " + map.mapFlag)) + " · " + map.mapFlag + (map.current ? " (" + node._("roborock-clean-rooms.loaded") + ")" : "");
                     block.append($("<div></div>").text(title));
                     if (!map.segments || !map.segments.length) {
-                        block.append($("<div class='form-tips'></div>").text(map.note || ""));
+                        block.append($("<div class='form-tips'></div>").text(noteText(map.note)));
                     }
                     (map.segments || []).forEach(function (segment) {
                         const id = String(segment.segmentId);

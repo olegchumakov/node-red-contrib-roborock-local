@@ -1,7 +1,7 @@
 {
     "roborock-maps": {
         "name": "maps & rooms",
-        "loadLabel": "load map {{mapFlag}}",
+        "loadLabel": "load map __mapFlag__",
         "label": {
             "device": "Device",
             "action": "Action",

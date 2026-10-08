@@ -1,7 +1,7 @@
 {
     "roborock-clean-rooms": {
         "name": "clean rooms",
-        "labelWith": "clean {{rooms}}",
+        "labelWith": "clean __rooms__",
         "label": {
             "device": "Device",
             "segments": "Room ids",
@@ -34,6 +34,11 @@
         "partial": "Could not read rooms for the loaded map. Floors are still listed.",
         "failed": "Could not read maps",
         "noMaps": "No saved maps returned.",
+        "notes": {
+            "whenLoaded": "Rooms appear once this floor has been loaded. Load it with the maps node (load a floor) or Show maps & rooms on the device, then pick again.",
+            "noMapping": "This map has no room mapping.",
+            "unreadable": "Room mapping could not be read for this map."
+        },
         "pickDevice": "Choose and deploy a device first.",
         "output": "result",
         "tip": "Tick rooms to fill the ids and the floor. If the floor is set and another one is loaded, the robot switches first (refused while it is cleaning). Leave the floor empty to clean on whichever floor is loaded. msg.segments, msg.names, msg.mapFlag, msg.repeat, msg.fan, msg.mop override the node."
