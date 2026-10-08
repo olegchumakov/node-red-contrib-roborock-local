@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0
 
 - New dedicated nodes: **command**, **status**, **clean rooms**, **settings**, **maps**, and **consumables**. They share the existing **roborock device** and its one TCP connection. **vacuum** stays as the universal node for any shorthand or raw `{"method","params"}`, including new or undocumented commands.
 - **status** sends events on a second output: `cleaning-started`, `cleaning-finished`, `error`, `error-cleared`, and a one-shot `low-battery`. Any input message reads the status on demand.

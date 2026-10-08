@@ -28,4 +28,4 @@ After a publish succeeds, the package's publishing access can be set to require 
 
 `repository.url` is `git+https://github.com/olegchumakov/node-red-contrib-roborock-local.git`. That is this GitHub repository, which npm requires for provenance.
 
-The Node-RED Flow Library uses the `node-red` keyword and the `node-red` section in `package.json`. That section requires Node-RED `>=3.0.0` and lists `roborock-account`, `roborock-device`, and `roborock-vacuum`.
+The Node-RED Flow Library uses the `node-red` keyword and the `node-red` section in `package.json`. That section requires Node-RED `>=3.0.0` and lists all nine nodes: `roborock-account`, `roborock-device`, `roborock-vacuum`, `roborock-command`, `roborock-status`, `roborock-clean-rooms`, `roborock-settings`, `roborock-maps`, and `roborock-consumables`.
