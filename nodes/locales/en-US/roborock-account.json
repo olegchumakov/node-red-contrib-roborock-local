@@ -1,0 +1,42 @@
+{
+    "roborock-account": {
+        "name": "roborock account",
+        "placeholder": {
+            "name": "Roborock account",
+            "baseUrl": "filled after auto-detect",
+            "code": "email code",
+            "password": "password (optional)",
+            "haSession": "Paste Home Assistant user_data JSON"
+        },
+        "label": {
+            "email": "Email",
+            "region": "Region",
+            "baseUrl": "Cloud URL",
+            "haSession": "Home Assistant session"
+        },
+        "region": {
+            "auto": "Auto-detect from the email",
+            "ru": "Russia — ruiot.roborock.com",
+            "eu": "Europe — euiot.roborock.com",
+            "us": "United States — usiot.roborock.com",
+            "cn": "China — cniot.roborock.com"
+        },
+        "tipUrl": "Leave the URL empty unless auto-detect picked the wrong server. It must be an https://*.roborock.com address.",
+        "sendCode": "Send code",
+        "loginCode": "Log in with code",
+        "loginPassword": "Log in with password",
+        "importSession": "Import Home Assistant session",
+        "tip": "Sign in here, or paste a Home Assistant session. Click Done, then fetch devices on the vacuum. No deploy is needed in between. The session stays in credentials, not in the flow file, and is not logged.",
+        "requesting": "Requesting a verification code...",
+        "codeSent": "Code sent.",
+        "sendFailed": "Could not send the code",
+        "signingIn": "Signing in...",
+        "signingInPassword": "Signing in with password...",
+        "signedIn": "Signed in.",
+        "loginFailed": "Login failed",
+        "checking": "Checking the imported session...",
+        "imported": "Session imported.",
+        "importFailed": "Could not import that session",
+        "next": "Click Done, then fetch devices on the vacuum. No deploy is needed yet."
+    }
+}

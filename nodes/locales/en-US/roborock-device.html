@@ -1,0 +1,37 @@
+<script type="text/html" data-help-name="roborock-device">
+    <p>Connection settings for one Roborock vacuum. Every Roborock node that points at this device shares one local TCP connection.</p>
+    <h3>Fields</h3>
+    <dl class="message-properties">
+        <dt>Account, Fetch devices from account</dt>
+        <dd>Lists the vacuums on a <b>roborock account</b> and fills in DUID, local key and model. With one vacuum on the account and an empty DUID, the fields are filled in for you.</dd>
+        <dt>IP</dt>
+        <dd>The robot's address. The cloud usually does not provide it: use <b>Find on LAN</b> (listens about 8 seconds on UDP 58866) or type it. If nothing is heard, type the IP. If the port is busy, another app on this host is using it.</dd>
+        <dt>DUID, Local key, Model</dt>
+        <dd>Filled by the account fetch, or typed in if you already have them.</dd>
+        <dt>Protocol</dt>
+        <dd><b>Auto</b> (recommended), <b>1.0</b> or <b>L01</b>. Auto uses the version that worked last time, else the one the cloud reports, else 1.0, then tries the other. It remembers the working version per device. Some models, such as the S8 Pro Ultra, answer only L01 on the LAN even when the cloud says 1.0. A fixed 1.0 or L01 is never second-guessed and fails with <code>No CONNACK</code> if the robot does not speak it.</dd>
+        <dt>Show maps &amp; rooms</dt>
+        <dd>Prints the floors and room ids. <b>Reload</b> re-reads the loaded floor and does not change the robot. <b>Load this map</b> asks first, switches the robot to that floor, reads its rooms and keeps them (refused while the robot is cleaning). Kept rooms are shown as <code>cached at</code> when another floor is loaded.</dd>
+    </dl>
+    <h3>Details</h3>
+    <ul>
+        <li>IP, DUID, local key and model are Node-RED credentials. They are not part of the node's config and are left out of exported flows. Set a fixed <code>credentialSecret</code> in <code>settings.js</code> before moving a flows file between machines.</li>
+        <li>Rooms appear only after they have been named in the Roborock app at least once. Until then the robot reports none.</li>
+        <li>Re-pairing the robot or resetting its Wi-Fi changes the local key. Fetch the device again and deploy. Timeouts and <code>decrypt failed</code> point at a stale key or a wrong IP.</li>
+        <li>The Admin API <code>POST /flows</code> takes a raw array. Put the secrets in the node's <code>credentials</code> object:</li>
+    </ul>
+    <pre>[
+  {
+    "id": "device1",
+    "type": "roborock-device",
+    "name": "Vacuum",
+    "protocol": "auto",
+    "credentials": {
+      "ip": "192.168.1.20",
+      "duid": "YOUR_DUID",
+      "localKey": "YOUR_LOCAL_KEY",
+      "model": "roborock.vacuum.xxx"
+    }
+  }
+]</pre>
+</script>

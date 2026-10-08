@@ -1,0 +1,20 @@
+{
+    "roborock-vacuum": {
+        "name": "roborock",
+        "label": {
+            "device": "Device",
+            "command": "Command",
+            "poll": "Poll",
+            "seconds": "seconds (0 = only when a message arrives)",
+            "onChange": "Emit status only when it changes"
+        },
+        "placeholder": {
+            "command": "used when msg.payload is empty"
+        },
+        "outputs": {
+            "result": "result",
+            "status": "status"
+        },
+        "tip": "The universal node: any shorthand or raw RPC method, including new or undocumented ones. The dedicated nodes (command, status, clean rooms, settings, maps, consumables) are simpler for everyday use. Output 1 is the result, output 2 is the status."
+    }
+}

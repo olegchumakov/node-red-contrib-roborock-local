@@ -1,0 +1,42 @@
+{
+    "roborock-account": {
+        "name": "аккаунт roborock",
+        "placeholder": {
+            "name": "Аккаунт Roborock",
+            "baseUrl": "заполнится после автоопределения",
+            "code": "код из письма",
+            "password": "пароль (необязательно)",
+            "haSession": "Вставьте JSON user_data из Home Assistant"
+        },
+        "label": {
+            "email": "Email",
+            "region": "Регион",
+            "baseUrl": "URL облака",
+            "haSession": "Сессия Home Assistant"
+        },
+        "region": {
+            "auto": "Определить по email",
+            "ru": "Россия — ruiot.roborock.com",
+            "eu": "Европа — euiot.roborock.com",
+            "us": "США — usiot.roborock.com",
+            "cn": "Китай — cniot.roborock.com"
+        },
+        "tipUrl": "Оставьте URL пустым, если автоопределение выбрало верный сервер. Адрес должен быть вида https://*.roborock.com.",
+        "sendCode": "Отправить код",
+        "loginCode": "Войти по коду",
+        "loginPassword": "Войти по паролю",
+        "importSession": "Импортировать сессию Home Assistant",
+        "tip": "Войдите здесь или вставьте сессию Home Assistant. Нажмите Done, затем получите устройства в ноде устройства. Deploy между этим не нужен. Сессия хранится в credentials, а не в файле потока, и не попадает в лог.",
+        "requesting": "Запрашиваю код подтверждения...",
+        "codeSent": "Код отправлен.",
+        "sendFailed": "Не удалось отправить код",
+        "signingIn": "Вхожу...",
+        "signingInPassword": "Вхожу по паролю...",
+        "signedIn": "Вход выполнен.",
+        "loginFailed": "Не удалось войти",
+        "checking": "Проверяю импортированную сессию...",
+        "imported": "Сессия импортирована.",
+        "importFailed": "Не удалось импортировать сессию",
+        "next": "Нажмите Done, затем получите устройства в ноде устройства. Deploy пока не нужен."
+    }
+}

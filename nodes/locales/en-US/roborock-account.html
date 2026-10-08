@@ -1,0 +1,22 @@
+<script type="text/html" data-help-name="roborock-account">
+    <p>Signs in to a Roborock account so <b>roborock device</b> can fetch the vacuum's DUID and local key. Day-to-day control does not use the cloud.</p>
+    <h3>Fields</h3>
+    <dl class="message-properties">
+        <dt>Email, Region</dt>
+        <dd>The address from the Roborock app. Region is detected from it; pick Russia, Europe, United States or China if that fails.</dd>
+        <dt>Send code, Log in with code</dt>
+        <dd>Sends a code to your email and signs in with it.</dd>
+        <dt>Log in with password</dt>
+        <dd>For accounts that have a password.</dd>
+        <dt>Home Assistant session</dt>
+        <dd>Paste <code>data.user_data</code> (or the whole <code>roborock</code> entry) from Home Assistant's <code>.storage/core.config_entries</code> and import it instead of using a code.</dd>
+    </dl>
+    <h3>Details</h3>
+    <ul>
+        <li>Click <b>Done</b>, then use <b>Fetch devices from account</b> on the device node. No deploy is needed in between.</li>
+        <li>The session is kept in credentials, not in the flow file, and is never logged. One account can serve several vacuums.</li>
+        <li>The key changes when the robot is removed and added again, or after a Wi-Fi reset. Sign in and fetch the device again, then deploy.</li>
+        <li>Roborock error 2018: the code was wrong or expired, send another. 3009 / 3006: accept the user agreement in the Roborock app. 9002: too many codes, wait.</li>
+        <li>Unofficial; not affiliated with Roborock.</li>
+    </ul>
+</script>

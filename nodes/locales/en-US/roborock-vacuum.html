@@ -1,0 +1,30 @@
+<script type="text/html" data-help-name="roborock-vacuum">
+    <p>The universal node: sends any shorthand or raw RPC method to the robot. Use it for new or undocumented commands. For everyday use the dedicated nodes (<b>command</b>, <b>status</b>, <b>clean rooms</b>, <b>settings</b>, <b>maps</b>, <b>consumables</b>) are simpler.</p>
+    <h3>Inputs</h3>
+    <dl class="message-properties">
+        <dt class="optional">payload <span class="property-type">string | object</span></dt>
+        <dd>A shorthand or an object, as listed below. When it is empty, the Command set on the node is used.</dd>
+    </dl>
+    <ul>
+        <li><code>start</code> (<code>resume</code>), <code>pause</code>, <code>stop</code>, <code>dock</code> (<code>home</code>, <code>charge</code>), <code>find</code>, <code>spot</code>, <code>status</code></li>
+        <li><code>{"command":"fan","speed":"turbo"}</code> sets the fan. Names: silent, balanced, turbo, max, gentle, auto (custom modes 101-106 on most current models). Some older firmware uses other numbers: pass a number, <code>{"command":"fan","speed":60}</code>.</li>
+        <li><code>{"command":"mop","intensity":"high"}</code> sets the mop level: off, low, medium, high, or a number.</li>
+        <li><code>{"command":"map_rooms"}</code> reads floors and room ids without changing the loaded map.</li>
+        <li><code>{"command":"maps"}</code> returns the raw <code>get_multi_maps_list</code> result.</li>
+        <li><code>{"command":"map","mapFlag":1}</code> loads that floor (<code>load_multi_map</code>) and switches the robot to it.</li>
+        <li><code>{"command":"rooms","segments":[16,17],"repeat":1}</code> cleans those room ids on the loaded floor. <code>{"command":"rooms","names":["Kitchen"]}</code> works when the name matches exactly one room on the loaded floor.</li>
+        <li><code>{"command":"zone","zones":[[x1,y1,x2,y2,1]]}</code> cleans zones.</li>
+        <li><code>{"method":"get_consumable","params":[]}</code> sends that RPC method unchanged.</li>
+    </ul>
+    <h3>Outputs</h3>
+    <ol class="node-ports">
+        <li>Result. <code>msg.payload</code> is the robot's reply, <code>msg.method</code> is the RPC name, and <code>msg.status</code> is the last known state when one has been read. The incoming message is kept.</li>
+        <li>Status. Sent after connect, on each poll and when the robot pushes a change. <code>msg.payload</code> has <code>stateName</code> (cleaning, returning, charging, idle, paused, error, ...), <code>errorName</code>, <code>battery</code> and <code>cleanAreaM2</code>. With <i>only when it changes</i> on, the first sample is still sent.</li>
+    </ol>
+    <h3>Details</h3>
+    <ul>
+        <li><code>map_rooms</code> returns <code>{currentMapFlag, maps:[{name, mapFlag, current, segments:[{segmentId, name?}]}]}</code>. Rooms appear once they have been named in the Roborock app. A floor that is not loaded shows rooms saved earlier (<code>cached: true</code>, <code>cachedAt</code>); otherwise load that floor once.</li>
+        <li>Poll is in seconds; 0 turns the timer off.</li>
+        <li>All nodes on one device share one TCP connection. It reconnects automatically.</li>
+    </ul>
+</script>

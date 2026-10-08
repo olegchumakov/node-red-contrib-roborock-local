@@ -1,111 +1,68 @@
 <script type="text/html" data-template-name="roborock-device">
     <div class="form-row">
-        <label for="node-config-input-name"><i class="fa fa-tag"></i> Name</label>
-        <input type="text" id="node-config-input-name" placeholder="Downstairs S7">
+        <label for="node-config-input-name"><i class="fa fa-tag"></i> <span data-i18n="node-red:common.label.name"></span></label>
+        <input type="text" id="node-config-input-name" data-i18n="[placeholder]roborock-device.placeholder.name">
     </div>
     <div class="form-row">
-        <label for="node-config-input-account"><i class="fa fa-user"></i> Account</label>
+        <label for="node-config-input-account"><i class="fa fa-user"></i> <span data-i18n="roborock-device.label.account"></span></label>
         <input type="text" id="node-config-input-account">
     </div>
     <div class="form-row">
-        <button type="button" class="red-ui-button" id="rr-fetch-account">Fetch devices from account</button>
+        <button type="button" class="red-ui-button" id="rr-fetch-account" data-i18n="roborock-device.fetch"></button>
     </div>
-    <div class="form-tips">Sign in on the roborock account node and click Done. Then pick the vacuum here. You do not need to deploy in between. One account can be used by several vacuums.</div>
+    <div class="form-tips" data-i18n="roborock-device.tipAccount"></div>
     <div id="rr-device-list" style="margin:8px 0;"></div>
-    <div class="form-tips" id="rr-device-status">The local key is stored in credentials and is not written into the exported flow.</div>
+    <div class="form-tips" id="rr-device-status" data-i18n="roborock-device.tipKey"></div>
 
     <hr>
     <div class="form-row">
-        <label for="node-config-input-deviceName"><i class="fa fa-android"></i> Vacuum</label>
-        <input type="text" id="node-config-input-deviceName" placeholder="name from the app">
+        <label for="node-config-input-deviceName"><i class="fa fa-android"></i> <span data-i18n="roborock-device.label.vacuum"></span></label>
+        <input type="text" id="node-config-input-deviceName" data-i18n="[placeholder]roborock-device.placeholder.vacuum">
     </div>
     <div class="form-row">
-        <label for="node-config-input-ip"><i class="fa fa-desktop"></i> IP</label>
+        <label for="node-config-input-ip"><i class="fa fa-desktop"></i> <span data-i18n="roborock-device.label.ip"></span></label>
         <input type="text" id="node-config-input-ip" placeholder="192.168.1.20" autocomplete="off">
     </div>
     <div class="form-row">
-        <label for="node-config-input-duid"><i class="fa fa-barcode"></i> DUID</label>
+        <label for="node-config-input-duid"><i class="fa fa-barcode"></i> <span data-i18n="roborock-device.label.duid"></span></label>
         <input type="text" id="node-config-input-duid" autocomplete="off">
     </div>
     <div class="form-row">
-        <label for="node-config-input-localKey"><i class="fa fa-key"></i> Local key</label>
+        <label for="node-config-input-localKey"><i class="fa fa-key"></i> <span data-i18n="roborock-device.label.localKey"></span></label>
         <input type="password" id="node-config-input-localKey" autocomplete="new-password">
     </div>
     <div class="form-row">
-        <label for="node-config-input-model"><i class="fa fa-info-circle"></i> Model</label>
-        <input type="text" id="node-config-input-model" placeholder="roborock.vacuum.a15">
+        <label for="node-config-input-model"><i class="fa fa-info-circle"></i> <span data-i18n="roborock-device.label.model"></span></label>
+        <input type="text" id="node-config-input-model" placeholder="roborock.vacuum.xxx">
     </div>
     <div class="form-row">
-        <label for="node-config-input-protocol"><i class="fa fa-exchange"></i> Protocol</label>
+        <label for="node-config-input-protocol"><i class="fa fa-exchange"></i> <span data-i18n="roborock-device.label.protocol"></span></label>
         <select id="node-config-input-protocol" style="width:70%">
-            <option value="auto">Auto (remembered, else account pv, then the other)</option>
-            <option value="1.0">1.0 — S7 and most robots</option>
+            <option value="auto" data-i18n="roborock-device.protocol.auto"></option>
+            <option value="1.0">1.0</option>
             <option value="L01">L01</option>
         </select>
     </div>
+    <div class="form-tips" data-i18n="roborock-device.tipProtocol"></div>
     <div class="form-row">
-        <button type="button" class="red-ui-button" id="rr-discover">Find on LAN</button>
+        <button type="button" class="red-ui-button" id="rr-discover" data-i18n="roborock-device.discover"></button>
     </div>
-    <div class="form-tips">The cloud response usually has no IP. Discovery listens for a few seconds on UDP 58866. If Home Assistant's Roborock integration is already bound to that port on this machine, type the IP. IP, DUID, local key, and model are credentials, not flow properties.</div>
+    <div class="form-tips" data-i18n="roborock-device.tipDiscover"></div>
     <div class="form-row">
-        <button type="button" class="red-ui-button" id="rr-show-maps">Show maps &amp; rooms</button>
+        <button type="button" class="red-ui-button" id="rr-show-maps" data-i18n="roborock-device.showMaps"></button>
     </div>
     <div id="rr-map-list" style="margin:8px 0;"></div>
     <div class="form-tips" id="rr-map-note"></div>
-    <div class="form-tips"><b>Reload</b> on the loaded map re-reads its rooms and does not change the robot. <b>Load this map</b> on another floor asks first, then switches the robot, reads that floor's rooms, and keeps them for later. Nothing is written into the node config. Clean and switch from the vacuum node with <code>{"command":"rooms","segments":[16]}</code> and <code>{"command":"map","mapFlag":1}</code>.</div>
+    <div class="form-tips" data-i18n="[html]roborock-device.tipMaps"></div>
     <input type="hidden" id="node-config-input-firmware">
     <input type="hidden" id="node-config-input-pv">
 </script>
 
-<script type="text/html" data-help-name="roborock-device">
-    <p>Connection settings for one Roborock vacuum on the local network. <code>local_key</code>, DUID, model, and IP are stored as Node-RED credentials and are omitted from flow exports. Cloud login is only on the <b>roborock account</b> node. One account can supply several vacuums.</p>
-    <h3>Get the key</h3>
-    <ol>
-        <li>Add a <b>roborock account</b> from the Account field, sign in (email code, password, or a Home Assistant session), and click <b>Done</b>. Do not deploy yet.</li>
-        <li>Back on this node, <b>Fetch devices from account</b> lists the vacuums. If this device has no DUID yet and the account has one vacuum, the fields are filled in for you.</li>
-        <li>Click <b>Find on LAN</b> if the IP is empty, or type it.</li>
-        <li>Click <b>Done</b>, then <b>Deploy</b> once. After that the vacuum node does not need the cloud.</li>
-    </ol>
-    <h3>Credentials, not config</h3>
-    <p><code>ip</code>, <code>duid</code>, <code>localKey</code>, and <code>model</code> are Node-RED credentials. They are not properties of the node config, and they are omitted from an exported flow. In the editor, type them in those fields and deploy.</p>
-    <p>The Admin API <code>POST /flows</code> with the default <code>Node-RED-API-Version: v1</code> takes a <b>raw array</b>. Put the secrets on that node's <code>credentials</code> object. Node-RED copies them into the credential store and does not keep them in <code>flows.json</code>:</p>
-    <pre>[
-  {
-    "id": "device1",
-    "type": "roborock-device",
-    "name": "S7",
-    "account": "account1",
-    "protocol": "auto",
-    "pv": "1.0",
-    "credentials": {
-      "ip": "192.168.1.20",
-      "duid": "YOUR_DUID",
-      "localKey": "YOUR_LOCAL_KEY",
-      "model": "roborock.vacuum.a15"
-    }
-  }
-]</pre>
-    <h3>Manual entry</h3>
-    <p>Paste IP, DUID, and local_key if you already have them (for example from <code>roborock-cloud-login</code>). An account is optional when those values are already filled in.</p>
-    <h3>Refreshing a key</h3>
-    <p>Re-pairing or a Wi-Fi reset rotates <code>local_key</code>. Sign in on the account node if the saved session expired, fetch the device again, and deploy. Timeouts and "decrypt failed" point at a stale key or a wrong IP, not at the cloud.</p>
-    <h3>Maps and rooms</h3>
-    <p><b>Show maps &amp; rooms</b> asks the robot for its floors and room ids and prints them in this dialog. The loaded floor is marked <code>(loaded)</code> and has <b>Reload</b>, which re-reads <code>get_room_mapping</code> and cloud names and refreshes the saved copy. It does not change the robot, so it does not ask first.</p>
-    <p>Floors that are not loaded have <b>Load this map</b>. That asks for confirmation, then sends <code>load_multi_map</code> with <code>[mapFlag]</code> (a number), reads that floor's rooms, and stores them. The robot's active floor changes. It is refused while the robot is cleaning. Afterward you can switch back to the floor that was loaded before. Rooms read this way stay in the list, with <code>cached at</code> and the time, even when another floor is loaded. The copy is a file in the Node-RED user directory (<code>roborock-local-map-cache.json</code>), keyed by DUID and map id. It is not part of the flow, and saving it does not need a deploy.</p>
-    <p><b>Name the rooms in the Roborock app at least once.</b> Rooms that were never named are not reported, so <code>get_room_mapping</code> returns <code>[]</code> and no rooms are listed anywhere, even on the loaded floor.</p>
-    <p><code>get_room_mapping</code> returns segments only for the loaded map, as <code>[segmentId, cloudRoomId, tag]</code>. An empty list means that loaded map reported no rooms. Other floors come from <code>get_multi_maps_list</code> and from this cache. When neither has rooms, the line is <code>rooms visible when this map is loaded</code>.</p>
-    <p>A room name is shown beside an id only when it is actually tied to that segment: either <code>get_room_mapping</code> links the segment to a cloud home room id from the account session, or the map list itself sent <code>iot_name</code> on that room. Home rooms that are not linked (old names still sitting on the account) are not shown. If the account session is missing, you still get the ids. A later read can still show a name that was cached for that same segment.</p>
-    <p>Control stays on the vacuum node:</p>
-    <pre>{"command":"map_rooms"}
-{"command":"map","mapFlag":1}
-{"command":"rooms","segments":[16,17]}
-{"command":"rooms","names":["Kitchen"]}</pre>
-    <p>Auto protocol tries the version that worked last time for this device, else the account <code>pv</code>, else 1.0, and then the other version. Some firmware reports <code>1.0</code> in the cloud but answers only L01 on the LAN, so <code>pv</code> is only a hint. The version that worked is remembered per device (a small file in the Node-RED user directory), so only the first connect pays for a failed hello. Choosing 1.0 or L01 yourself is never second-guessed and reports <code>No CONNACK</code> if the firmware does not speak it.</p>
-    <p>A cloud session that was saved on this device node in an older version is ignored. Local control keeps using the IP, DUID, and local key.</p>
-</script>
-
 <script type="text/javascript">
 (function () {
+    function t(key, options) {
+        return RED._("roborock-device." + key, options);
+    }
     function postJSON(url, body) {
         return $.ajax({
             url: url,
@@ -173,7 +130,7 @@
             model: { type: "text" }
         },
         label: function () {
-            return this.name || this.deviceName || "roborock device";
+            return this.name || this.deviceName || this._("roborock-device.name");
         },
         oneditprepare: function () {
             const node = this;
@@ -186,7 +143,7 @@
             let mapBusy = false;
             function cachedLabel(iso) {
                 const text = String(iso || "").replace("T", " ").replace(/\.\d+Z$/, "Z");
-                return "cached at " + (text || iso);
+                return t("cachedAt", { time: text || iso });
             }
             function requestBody() {
                 const key = $("#node-config-input-localKey").val();
@@ -207,15 +164,15 @@
                 const host = $("#rr-map-list").empty();
                 const maps = data.maps || [];
                 if (!maps.length) {
-                    host.append($("<div class='form-tips'></div>").text(data.mapsError || "No saved maps returned."));
+                    host.append($("<div class='form-tips'></div>").text(data.mapsError || t("noMaps")));
                 }
                 maps.forEach(function (map) {
                     const block = $("<div style='margin:6px 0'></div>");
-                    const title = (map.name || ("Map " + map.mapFlag)) + " · map " + map.mapFlag + (map.current ? " (loaded)" : "");
+                    const title = (map.name || t("mapDefault", { flag: map.mapFlag })) + " · " + t("mapNo", { flag: map.mapFlag }) + (map.current ? " (" + t("loaded") + ")" : "");
                     block.append($("<div></div>").text(title));
                     if (map.segments && map.segments.length) {
                         map.segments.forEach(function (segment) {
-                            block.append($("<div class='form-tips'></div>").text("room " + segmentLabel(segment)));
+                            block.append($("<div class='form-tips'></div>").text(t("room", { label: segmentLabel(segment) })));
                         });
                     } else if (map.note) {
                         block.append($("<div class='form-tips'></div>").text(map.note));
@@ -224,13 +181,13 @@
                         block.append($("<div class='form-tips'></div>").text(cachedLabel(map.cachedAt)));
                     }
                     if (map.current) {
-                        const reload = $("<button type='button' class='red-ui-button'>Reload</button>");
+                        const reload = $("<button type='button' class='red-ui-button'></button>").text(t("reload"));
                         reload.on("click", function () {
                             showMaps("reload");
                         });
                         block.append(reload);
                     } else {
-                        const load = $("<button type='button' class='red-ui-button'>Load this map</button>");
+                        const load = $("<button type='button' class='red-ui-button'></button>").text(t("loadThis"));
                         load.on("click", function () {
                             loadMap(map);
                         });
@@ -240,9 +197,9 @@
                 });
                 if (data.loadedSegments && data.loadedSegments.length) {
                     const extra = $("<div style='margin:6px 0'></div>");
-                    extra.append($("<div class='form-tips'></div>").text(data.loadedSegmentsNote || "Loaded map rooms"));
+                    extra.append($("<div class='form-tips'></div>").text(data.loadedSegmentsNote || t("loadedRooms")));
                     data.loadedSegments.forEach(function (segment) {
-                        extra.append($("<div class='form-tips'></div>").text("room " + segmentLabel(segment)));
+                        extra.append($("<div class='form-tips'></div>").text(t("room", { label: segmentLabel(segment) })));
                     });
                     host.append(extra);
                 }
@@ -257,16 +214,16 @@
                 const body = requestBody();
                 body.action = action || "read";
                 mapBusy = true;
-                setMapNote(body.action === "reload" ? "Reloading rooms..." : "Reading maps...");
+                setMapNote(body.action === "reload" ? t("reloading") : t("reading"));
                 postJSON("roborock-local/map-rooms", body).done(function (data) {
                     renderCatalog(data);
                     if (data.mappingError) {
-                        setMapNote("Could not read rooms for the loaded map. Floors are still listed. " + data.mappingError);
+                        setMapNote(t("partial", { error: data.mappingError }));
                     } else {
                         setMapNote("");
                     }
                 }).fail(function (xhr) {
-                    showMapError(xhr, "Could not read maps");
+                    showMapError(xhr, t("readFailed"));
                 }).always(function () {
                     mapBusy = false;
                 });
@@ -277,12 +234,12 @@
                 body.mapFlag = Number(mapFlag);
                 body.confirmed = true;
                 mapBusy = true;
-                setMapNote("Switching back to map " + mapFlag + "...");
+                setMapNote(t("switchingBack", { flag: mapFlag }));
                 postJSON("roborock-local/map-rooms", body).done(function (data) {
                     renderCatalog(data);
                     setMapNote("");
                 }).fail(function (xhr) {
-                    showMapError(xhr, "Could not switch back");
+                    showMapError(xhr, t("switchBackFailed"));
                 }).always(function () {
                     mapBusy = false;
                 });
@@ -291,8 +248,8 @@
                 if (mapBusy) {
                     return;
                 }
-                const name = map.name || ("map " + map.mapFlag);
-                if (!confirm("Load \"" + name + "\" (map " + map.mapFlag + ") on the robot? This changes the active floor.")) {
+                const name = map.name || t("mapNo", { flag: map.mapFlag });
+                if (!confirm(t("confirmLoad", { name: name, flag: map.mapFlag }))) {
                     return;
                 }
                 const body = requestBody();
@@ -301,25 +258,25 @@
                 body.confirmed = true;
                 mapBusy = true;
                 let followUp = false;
-                setMapNote("Loading map " + map.mapFlag + "...");
+                setMapNote(t("loading", { flag: map.mapFlag }));
                 postJSON("roborock-local/map-rooms", body).done(function (data) {
                     renderCatalog(data);
                     if (data.mapSwitchUnconfirmed) {
-                        setMapNote("The robot was asked to load map " + map.mapFlag + ", but its status still shows another floor.");
+                        setMapNote(t("unconfirmed", { flag: map.mapFlag }));
                     } else {
                         setMapNote("");
                     }
                     const previous = data.previousMapFlag;
                     if (previous !== null && previous !== undefined && previous !== data.currentMapFlag) {
                         const prev = (data.maps || []).find(function (item) { return item.mapFlag === previous; });
-                        const prevName = prev && prev.name ? prev.name : ("map " + previous);
-                        if (confirm("Rooms saved for \"" + name + "\". Switch back to \"" + prevName + "\" (map " + previous + ")?")) {
+                        const prevName = prev && prev.name ? prev.name : t("mapNo", { flag: previous });
+                        if (confirm(t("confirmBack", { name: name, prev: prevName, flag: previous }))) {
                             followUp = true;
                             restoreMap(previous);
                         }
                     }
                 }).fail(function (xhr) {
-                    showMapError(xhr, "Could not load that map");
+                    showMapError(xhr, t("loadFailed"));
                 }).always(function () {
                     if (!followUp) {
                         mapBusy = false;
@@ -341,22 +298,21 @@
                 if (!$("#node-config-input-name").val()) {
                     $("#node-config-input-name").val(device.name || "");
                 }
-                const protocolNote = device.pv === "1.0" ? " Protocol 1.0 from the account; auto tries it first and falls back to L01." : "";
-                setStatus("Selected " + (device.name || device.duid) + ". Click Done, then Deploy once" + (device.ip ? "." : ", then set the IP or use Find on LAN.") + protocolNote);
+                setStatus(t(device.ip ? "selected" : "selectedNoIp", { name: device.name || device.duid }));
             }
             function renderDevices(devices) {
                 const host = $("#rr-device-list").empty();
                 if (!devices || !devices.length) {
-                    host.text("No vacuums returned.");
+                    host.text(t("noVacuums"));
                     return;
                 }
                 devices.forEach(function (device) {
                     const label = [
-                        device.name || "Vacuum",
+                        device.name || t("vacuumDefault"),
                         device.model || "",
-                        device.firmware ? "fw " + device.firmware : "",
-                        device.ip || "IP unknown",
-                        device.online === false ? "offline in cloud" : ""
+                        device.firmware ? t("firmware", { version: device.firmware }) : "",
+                        device.ip || t("ipUnknown"),
+                        device.online === false ? t("offline") : ""
                     ].filter(Boolean).join(" · ");
                     const button = $("<button type='button' class='red-ui-button' style='display:block;margin:4px 0;text-align:left;'></button>");
                     button.text(label);
@@ -373,9 +329,9 @@
                     applyDevice(devices[0]);
                     return;
                 }
-                const extra = data.discoveryError ? " LAN discovery: " + data.discoveryError : "";
-                const picked = devices.length > 1 ? " Pick a vacuum." : "";
-                setStatus((data.message || ("Found " + devices.length + " device(s).")) + picked + extra);
+                const extra = data.discoveryError ? " " + t("discoveryError", { error: data.discoveryError }) : "";
+                const picked = devices.length > 1 ? " " + t("pick") : "";
+                setStatus((data.message || t("found", { count: devices.length })) + picked + extra);
             }
             function accountRequest(accountId) {
                 const account = RED.nodes.node(accountId);
@@ -406,14 +362,14 @@
             function fetchFromAccount(autoFill) {
                 const accountId = $("#node-config-input-account").val();
                 if (!accountId) {
-                    setStatus("Select a roborock account. Sign in there and click Done. Deploy is not required before the fetch.", true);
+                    setStatus(t("selectAccount"), true);
                     return;
                 }
-                setStatus("Loading devices...");
+                setStatus(t("loadingDevices"));
                 postJSON("roborock-local/devices", accountRequest(accountId)).done(function (data) {
                     showDevices(data, autoFill);
                 }).fail(function (xhr) {
-                    setStatus((xhr.responseJSON && xhr.responseJSON.error) || "Could not load devices", true);
+                    setStatus((xhr.responseJSON && xhr.responseJSON.error) || t("loadDevicesFailed"), true);
                 });
             }
             $("#node-config-input-account").on("change", function () {
@@ -430,33 +386,33 @@
                 fetchFromAccount(!$("#node-config-input-duid").val());
             });
             $("#rr-discover").on("click", function () {
-                setStatus("Listening for vacuum announcements on UDP 58866...");
+                setStatus(t("listening"));
                 postJSON("roborock-local/discover", { timeoutMs: 8000 }).done(function (data) {
                     const list = data.devices || [];
                     if (!list.length) {
-                        setStatus("No announcements heard. The robot broadcasts occasionally; try again, or type the IP. UDP 58866 must reach this machine.", true);
+                        setStatus(t("nothingHeard"), true);
                         return;
                     }
                     const duid = $("#node-config-input-duid").val();
                     const match = duid ? list.find(function (item) { return item.duid === duid; }) : null;
                     if (match) {
                         $("#node-config-input-ip").val(match.ip);
-                        setStatus("Found " + match.duid + " at " + match.ip + ".");
+                        setStatus(t("foundAt", { duid: match.duid, ip: match.ip }));
                         return;
                     }
                     const lines = list.map(function (item) {
                         return escapeHtml(item.duid) + " · " + escapeHtml(item.ip) + " · " + escapeHtml(item.version);
                     }).join("<br>");
-                    $("#rr-device-list").html("<div class='form-tips'>Heard on the LAN:<br>" + lines + "</div>");
+                    $("#rr-device-list").html("<div class='form-tips'>" + escapeHtml(t("heardOnLan")) + "<br>" + lines + "</div>");
                     if (list.length === 1 && !$("#node-config-input-ip").val()) {
                         $("#node-config-input-ip").val(list[0].ip);
                         if (!$("#node-config-input-duid").val()) {
                             $("#node-config-input-duid").val(list[0].duid);
                         }
                     }
-                    setStatus("Heard " + list.length + " announcement(s).");
+                    setStatus(t("heardCount", { count: list.length }));
                 }).fail(function (xhr) {
-                    setStatus((xhr.responseJSON && xhr.responseJSON.error) || "Discovery failed", true);
+                    setStatus((xhr.responseJSON && xhr.responseJSON.error) || t("discoveryFailed"), true);
                 });
             });
             $("#rr-show-maps").on("click", function () {

@@ -745,7 +745,9 @@ describe("split nodes", () => {
 describe("package layout", () => {
     const root = path.join(__dirname, "..");
     const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
-    const added = ["command", "status", "clean-rooms", "settings", "maps", "consumables"].map((name) => `roborock-${name}`);
+    const added = ["command", "status", "clean-rooms", "settings", "maps", "consumables", "vacuum", "device", "account"].map((name) => `roborock-${name}`);
+    const flowNodes = ["command", "status", "clean-rooms", "settings", "maps", "consumables", "vacuum"].map((name) => `roborock-${name}`);
+    const read = (...parts) => fs.readFileSync(path.join(root, ...parts), "utf8");
 
     test("every registered node has its files, and the new nodes have English and Russian text and help", () => {
         for (const [type, file] of Object.entries(pkg["node-red"].nodes)) {
@@ -764,7 +766,9 @@ describe("package layout", () => {
             const html = fs.readFileSync(path.join(root, "nodes", `${type}.html`), "utf8");
             const used = [...html.matchAll(/["'(]?(roborock-[a-z-]+\.[A-Za-z.]+)/g)].map((match) => match[1]).filter((key) => key.startsWith(`${type}.`));
             const known = new Set(keyPaths(en));
-            for (const key of used) {
+            const direct = [...html.matchAll(/\bt\("([A-Za-z.]+)"/g)].map((match) => `${type}.${match[1]}`);
+            const conditional = [...html.matchAll(/\bt\(\w+\.ip \? "(\w+)" : "(\w+)"/g)].flatMap((match) => [match[1], match[2]].map((key) => `${type}.${key}`));
+            for (const key of [...used, ...direct, ...conditional]) {
                 const stem = key.replace(/\.$/, "");
                 const exists = known.has(stem) || [...known].some((known_) => known_.startsWith(`${stem}.`));
                 assert.ok(exists, `${type} uses missing text key ${key}`);
@@ -772,12 +776,51 @@ describe("package layout", () => {
         }
     });
 
+    test("every node help has the same structure in English and Russian", () => {
+        const headings = {
+            "en-US": { flow: ["Inputs", "Outputs", "Details"], config: ["Fields", "Details"] },
+            ru: { flow: ["Входы", "Выходы", "Подробности"], config: ["Поля", "Подробности"] }
+        };
+        for (const lang of ["en-US", "ru"]) {
+            for (const type of added) {
+                const help = read("nodes/locales", lang, `${type}.html`);
+                const expected = flowNodes.includes(type) ? headings[lang].flow : headings[lang].config;
+                const found = [...help.matchAll(/<h3>([^<]+)<\/h3>/g)].map((match) => match[1]);
+                assert.deepEqual(found, expected, `${type} ${lang} headings`);
+                assert.match(help, /^<script type="text\/html" data-help-name="[a-z-]+">\n {4}<p>/, `${type} ${lang} starts with a one-line purpose`);
+                assert.equal(help.match(/data-help-name/g).length, 1);
+            }
+        }
+    });
+
+    test("the docs describe what the nodes do: no miIO, no model-specific framing, no history", () => {
+        const files = ["README.md", "package.json"];
+        for (const dir of ["nodes", "nodes/locales/en-US", "nodes/locales/ru"]) {
+            for (const name of fs.readdirSync(path.join(root, dir))) {
+                if (/\.(html|json)$/.test(name)) {
+                    files.push(path.join(dir, name));
+                }
+            }
+        }
+        const banned = /54321|miIO|\bS7\b|Downstairs|a15\b|python-miio|not implemented|no longer|used to be|previously|in an older version/;
+        for (const file of files) {
+            const text = read(file);
+            const hit = text.match(banned);
+            assert.equal(hit, null, `${file} mentions ${hit && hit[0]}`);
+        }
+        assert.match(read("README.md"), /S8 Pro Ultra/, "the L01-only finding is kept");
+        for (const type of ["roborock-device"]) {
+            for (const lang of ["en-US", "ru"]) {
+                assert.match(read("nodes/locales", lang, `${type}.html`), /S8 Pro Ultra/);
+            }
+        }
+    });
+
     test("the README and the help say rooms must be named in the Roborock app", () => {
         const needle = /named in the Roborock app|Name the rooms in the Roborock app/;
         assert.match(fs.readFileSync(path.join(root, "README.md"), "utf8"), needle);
-        assert.match(fs.readFileSync(path.join(root, "nodes/roborock-device.html"), "utf8"), needle);
         for (const lang of ["en-US", "ru"]) {
-            for (const type of ["roborock-maps", "roborock-clean-rooms"]) {
+            for (const type of ["roborock-maps", "roborock-clean-rooms", "roborock-device", "roborock-vacuum"]) {
                 const help = fs.readFileSync(path.join(root, "nodes/locales", lang, `${type}.html`), "utf8");
                 assert.match(help, lang === "ru" ? /в приложении Roborock/ : needle, `${type} ${lang} help`);
             }

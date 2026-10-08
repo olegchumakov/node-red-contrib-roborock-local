@@ -1,17 +1,21 @@
 <script type="text/html" data-help-name="roborock-command">
-    <p>Sends one plain action to a Roborock vacuum over the local network.</p>
-    <h3>Input</h3>
+    <p>Sends one plain action to the robot: start, pause, stop, dock, find or spot.</p>
+    <h3>Inputs</h3>
     <dl class="message-properties">
         <dt class="optional">payload <span class="property-type">string</span></dt>
-        <dd>Optional. <code>start</code> (<code>resume</code>), <code>pause</code>, <code>stop</code>, <code>dock</code> (<code>home</code>, <code>charge</code>, <code>return</code>), <code>find</code> (<code>locate</code>), <code>spot</code>. Replaces the action chosen on the node. Anything else is rejected.</dd>
+        <dd>Replaces the action chosen on the node: <code>start</code> (<code>resume</code>), <code>pause</code>, <code>stop</code>, <code>dock</code> (<code>home</code>, <code>charge</code>, <code>return</code>), <code>find</code> (<code>locate</code>), <code>spot</code>. Anything else is rejected.</dd>
     </dl>
-    <h3>Output</h3>
+    <h3>Outputs</h3>
     <dl class="message-properties">
         <dt>payload</dt><dd>the robot's reply</dd>
         <dt>command, method</dt><dd>the action and the RPC method that was sent</dd>
         <dt>status</dt><dd>the last known robot state</dd>
-        <dt>retried</dt><dd><code>true</code> when a locked dock was retried</dd>
+        <dt>retried</dt><dd><code>true</code> when a refused dock was retried</dd>
     </dl>
-    <p>Right after a pause the robot can refuse <b>dock</b> with <code>action locked (-10003)</code> and accept it a few seconds later. The node waits about 12 seconds and tries once more. Other actions and other errors are not retried.</p>
-    <p>The incoming message is kept, so <code>msg.topic</code> and your own properties pass through. For commands this node does not offer, including undocumented ones, use <b>roborock-vacuum</b>.</p>
+    <h3>Details</h3>
+    <ul>
+        <li>Right after a pause the robot can refuse <b>dock</b> with <code>action locked (-10003)</code>. The node retries once after about 12 seconds. Other actions and errors are not retried.</li>
+        <li>The incoming message is kept, so <code>msg.topic</code> and your own properties pass through.</li>
+        <li>For commands this node does not offer, use <b>roborock-vacuum</b>.</li>
+    </ul>
 </script>

@@ -1,13 +1,20 @@
 <script type="text/html" data-help-name="roborock-settings">
     <p>Sets the fan speed and the mop level.</p>
-    <h3>Input</h3>
+    <h3>Inputs</h3>
     <dl class="message-properties">
         <dt class="optional">fan <span class="property-type">string | number</span></dt>
-        <dd><code>silent</code>, <code>balanced</code>, <code>turbo</code>, <code>max</code>, <code>gentle</code>, <code>auto</code>, or a raw mode number. Also read from <code>msg.payload.fan</code>.</dd>
+        <dd><code>silent</code>, <code>balanced</code>, <code>turbo</code>, <code>max</code>, <code>gentle</code>, <code>auto</code>, or a mode number. Also read from <code>msg.payload.fan</code>.</dd>
         <dt class="optional">mop <span class="property-type">string | number</span></dt>
-        <dd><code>off</code>, <code>low</code>, <code>medium</code>, <code>high</code>, or a raw number. Also read from <code>msg.payload.mop</code>.</dd>
+        <dd><code>off</code>, <code>low</code>, <code>medium</code>, <code>high</code>, or a number. Also read from <code>msg.payload.mop</code>.</dd>
     </dl>
-    <h3>Output</h3>
-    <p><code>msg.payload</code> is <code>{fan, mop}</code> with the robot's reply for each one that was set. <code>msg.applied</code> has the numeric codes that were sent.</p>
-    <p>Named fan speeds are the S7 codes 101-106. Older firmware may want 38 / 60 / 77 / 90, so send a number.</p>
+    <h3>Outputs</h3>
+    <dl class="message-properties">
+        <dt>payload</dt><dd><code>{fan, mop}</code> with the robot's reply for each one that was set</dd>
+        <dt>applied</dt><dd>the numeric codes that were sent</dd>
+    </dl>
+    <h3>Details</h3>
+    <ul>
+        <li>Named fan speeds are custom modes 101-106 (most current models). Some older firmware uses other numbers: pass a number.</li>
+        <li>The value goes out as a one-element list, for example <code>[103]</code>.</li>
+    </ul>
 </script>
