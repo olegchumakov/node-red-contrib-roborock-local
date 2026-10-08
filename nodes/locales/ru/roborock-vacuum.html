@@ -1,0 +1,30 @@
+<script type="text/html" data-help-name="roborock-vacuum">
+    <p>Универсальная нода: отправляет роботу любую команду-сокращение или «сырой» RPC-метод. Используйте её для новых и недокументированных команд. Для повседневных задач проще специальные ноды (<b>command</b>, <b>status</b>, <b>clean rooms</b>, <b>settings</b>, <b>maps</b>, <b>consumables</b>).</p>
+    <h3>Входы</h3>
+    <dl class="message-properties">
+        <dt class="optional">payload <span class="property-type">string | object</span></dt>
+        <dd>Сокращение или объект из списка ниже. Если пусто, берётся команда, заданная в ноде.</dd>
+    </dl>
+    <ul>
+        <li><code>start</code> (<code>resume</code>), <code>pause</code>, <code>stop</code>, <code>dock</code> (<code>home</code>, <code>charge</code>), <code>find</code>, <code>spot</code>, <code>status</code></li>
+        <li><code>{"command":"fan","speed":"turbo"}</code> задаёт мощность. Имена: silent, balanced, turbo, max, gentle, auto (режимы 101–106 на большинстве современных моделей). Некоторые старые прошивки используют другие числа: передайте число, <code>{"command":"fan","speed":60}</code>.</li>
+        <li><code>{"command":"mop","intensity":"high"}</code> задаёт мойку: off, low, medium, high или число.</li>
+        <li><code>{"command":"map_rooms"}</code> читает этажи и id комнат, не меняя загруженную карту.</li>
+        <li><code>{"command":"maps"}</code> возвращает «сырой» ответ <code>get_multi_maps_list</code>.</li>
+        <li><code>{"command":"map","mapFlag":1}</code> загружает этот этаж (<code>load_multi_map</code>) и переключает на него робота.</li>
+        <li><code>{"command":"rooms","segments":[16,17],"repeat":1}</code> убирает эти комнаты на загруженном этаже. <code>{"command":"rooms","names":["Kitchen"]}</code> работает, если имя совпадает ровно с одной комнатой загруженного этажа.</li>
+        <li><code>{"command":"zone","zones":[[x1,y1,x2,y2,1]]}</code> убирает зоны.</li>
+        <li><code>{"method":"get_consumable","params":[]}</code> отправляет этот RPC-метод как есть.</li>
+    </ul>
+    <h3>Выходы</h3>
+    <ol class="node-ports">
+        <li>Результат. <code>msg.payload</code> — ответ робота, <code>msg.method</code> — имя RPC, <code>msg.status</code> — последнее известное состояние, если оно уже читалось. Входящее сообщение сохраняется.</li>
+        <li>Статус. Приходит после подключения, при каждом опросе и когда робот сам присылает изменение. В <code>msg.payload</code>: <code>stateName</code> (cleaning, returning, charging, idle, paused, error, ...), <code>errorName</code>, <code>battery</code>, <code>cleanAreaM2</code>. При включённом «только при изменении» первый замер всё равно отправляется.</li>
+    </ol>
+    <h3>Подробности</h3>
+    <ul>
+        <li><code>map_rooms</code> возвращает <code>{currentMapFlag, maps:[{name, mapFlag, current, segments:[{segmentId, name?}]}]}</code>. Комнаты появляются после того, как их назвали в приложении Roborock. У незагруженного этажа показаны ранее сохранённые комнаты (<code>cached: true</code>, <code>cachedAt</code>); иначе один раз загрузите этот этаж.</li>
+        <li>Опрос задаётся в секундах; 0 выключает таймер.</li>
+        <li>Все ноды одного устройства используют одно TCP-соединение. Оно переподключается само.</li>
+    </ul>
+</script>

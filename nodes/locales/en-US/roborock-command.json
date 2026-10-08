@@ -1,0 +1,18 @@
+{
+    "roborock-command": {
+        "label": {
+            "device": "Device",
+            "action": "Action"
+        },
+        "actions": {
+            "start": "start / resume",
+            "pause": "pause",
+            "stop": "stop",
+            "dock": "return to dock",
+            "find": "find (beep)",
+            "spot": "spot clean"
+        },
+        "output": "result",
+        "tip": "One plain action per node. A string in msg.payload (start, pause, stop, dock, find, spot) overrides the choice. A dock refused as locked right after a pause is retried once after about 12 seconds. For anything else use the roborock-vacuum node."
+    }
+}

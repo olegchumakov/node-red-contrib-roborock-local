@@ -1,50 +1,27 @@
 <script type="text/html" data-template-name="roborock-vacuum">
     <div class="form-row">
-        <label for="node-input-name"><i class="fa fa-tag"></i> Name</label>
-        <input type="text" id="node-input-name" placeholder="vacuum">
+        <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="node-red:common.label.name"></span></label>
+        <input type="text" id="node-input-name" data-i18n="[placeholder]node-red:common.label.name">
     </div>
     <div class="form-row">
-        <label for="node-input-device"><i class="fa fa-android"></i> Device</label>
+        <label for="node-input-device"><i class="fa fa-android"></i> <span data-i18n="roborock-vacuum.label.device"></span></label>
         <input type="text" id="node-input-device">
     </div>
     <div class="form-row">
-        <label for="node-input-command"><i class="fa fa-terminal"></i> Command</label>
-        <input type="text" id="node-input-command" placeholder="used when msg.payload is empty">
+        <label for="node-input-command"><i class="fa fa-terminal"></i> <span data-i18n="roborock-vacuum.label.command"></span></label>
+        <input type="text" id="node-input-command" data-i18n="[placeholder]roborock-vacuum.placeholder.command">
     </div>
     <div class="form-row">
-        <label for="node-input-pollInterval"><i class="fa fa-clock-o"></i> Poll</label>
+        <label for="node-input-pollInterval"><i class="fa fa-clock-o"></i> <span data-i18n="roborock-vacuum.label.poll"></span></label>
         <input type="number" id="node-input-pollInterval" min="0" step="1" style="width:80px">
-        <span>seconds (0 = only when a message arrives)</span>
+        <span data-i18n="roborock-vacuum.label.seconds"></span>
     </div>
     <div class="form-row">
         <label for="node-input-statusOnChange">&nbsp;</label>
         <input type="checkbox" id="node-input-statusOnChange" style="width:auto; margin-top:0">
-        <label for="node-input-statusOnChange" style="width:auto"> Emit status only when it changes</label>
+        <label for="node-input-statusOnChange" style="width:auto"> <span data-i18n="roborock-vacuum.label.onChange"></span></label>
     </div>
-    <div class="form-tips">Output 1 is the command result. Output 2 is polled or pushed status. The node status line shows the state and battery. Control stays on the LAN after the key is saved.</div>
-</script>
-
-<script type="text/html" data-help-name="roborock-vacuum">
-    <p>Controls one Roborock vacuum over the local TCP API on port <b>58867</b>. Classic miIO UDP port 54321 is not used; an S7 on current firmware does not answer it.</p>
-    <h3>Input</h3>
-    <p><code>msg.payload</code> is a shorthand string or an object.</p>
-    <ul>
-        <li><code>start</code>, <code>pause</code>, <code>stop</code>, <code>dock</code> (also <code>home</code>, <code>charge</code>), <code>find</code>, <code>spot</code>, <code>status</code></li>
-        <li><code>{"command":"fan","speed":"turbo"}</code> — silent, balanced, turbo, max, gentle, auto, or a raw number. S7 custom modes are 101–106. Older firmware may want 38/60/77/90; pass the number.</li>
-        <li><code>{"command":"mop","intensity":"high"}</code> — off, low, medium, high</li>
-        <li><code>{"command":"map_rooms"}</code> (alias <code>maps_rooms</code>) reads floors and room ids without switching the loaded map. <code>msg.payload</code> is <code>{currentMapFlag, maps:[{name, mapFlag, current, segments:[{segmentId, name?}]}]}</code>. A floor that is not loaded can still list rooms saved earlier, with <code>cached: true</code> and <code>cachedAt</code>. A map with no readable rooms has <code>note</code> instead of segments. <code>rooms visible when this map is loaded</code> means that floor's segments are not in <code>get_multi_maps_list</code> and have not been cached. A name is set only when <code>get_room_mapping</code> links the segment to a cloud home room, or when that map's <code>rooms</code> entry included <code>iot_name</code>. <code>{"command":"maps"}</code> is unchanged and still returns the raw <code>get_multi_maps_list</code> result.</li>
-        <li><code>{"command":"map","mapFlag":1}</code> sends <code>load_multi_map</code> with params <code>[1]</code> (a number; a numeric string is coerced) and switches the robot to that floor. <code>id</code> is accepted in place of <code>mapFlag</code>.</li>
-        <li><code>{"command":"rooms","segments":[16,17],"repeat":1}</code> cleans those segment ids on the loaded map. <code>{"command":"rooms","names":["Kitchen"]}</code> or <code>{"command":"rooms","name":"Kitchen"}</code> works when that name is mapped to exactly one segment on the loaded map, including a name kept in that map's cache. A name that exists only on another floor's cache is rejected. <code>names:["16"]</code> and <code>names:["Room 16"]</code> are segment 16. Segment cleaning does not change floors by itself.</li>
-        <li><code>{"command":"zone","zones":[[x1,y1,x2,y2,1]]}</code></li>
-        <li><code>{"method":"get_consumable","params":[]}</code> sends that RPC method as-is</li>
-    </ul>
-    <h3>Outputs</h3>
-    <p><b>Result</b> — <code>msg.payload</code> is the device result, <code>msg.method</code> is the RPC name, and <code>msg.status</code> is the last known state when one has been read.</p>
-    <p><b>Status</b> — emitted after connect, on each poll, and when the robot pushes state. <code>msg.payload.stateName</code> is text such as <code>cleaning</code>, <code>returning</code>, <code>charging</code>, <code>idle</code>, or <code>error</code>. <code>errorName</code> maps the numeric code. With <i>only when it changes</i> enabled, the first sample is still sent.</p>
-    <h3>Connection</h3>
-    <p>The node keeps one TCP session per device, answers with matching request ids, sends a keepalive, and reconnects with backoff. Redeploy and node close shut the socket down. Auto mode tries protocol 1.0, then L01, unless the device <code>pv</code> from the account is <code>1.0</code> — then L01 is skipped. Choosing L01 anyway reports <code>No CONNACK for L01</code> when the firmware does not speak it.</p>
-    <p>IP, DUID, local key, and model are credentials on the device config node. A <code>POST /flows</code> raw array sets them with a <code>credentials</code> object on that node, not as ordinary config fields.</p>
-    <p>Unofficial, not affiliated with Roborock.</p>
+    <div class="form-tips" data-i18n="roborock-vacuum.tip"></div>
 </script>
 
 <script type="text/javascript">
@@ -60,11 +37,13 @@
         },
         inputs: 1,
         outputs: 2,
-        outputLabels: ["result", "status"],
+        outputLabels: function (index) {
+            return this._("roborock-vacuum.outputs." + (index === 0 ? "result" : "status"));
+        },
         icon: "roborock.svg",
         paletteLabel: "vacuum",
         label: function () {
-            return this.name || "roborock";
+            return this.name || this._("roborock-vacuum.name");
         },
         labelStyle: function () {
             return this.name ? "node_label_italic" : "";

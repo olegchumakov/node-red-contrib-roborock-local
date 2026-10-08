@@ -1,0 +1,41 @@
+<script type="text/html" data-template-name="roborock-consumables">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="node-red:common.label.name"></span></label>
+        <input type="text" id="node-input-name" data-i18n="[placeholder]node-red:common.label.name">
+    </div>
+    <div class="form-row">
+        <label for="node-input-device"><i class="fa fa-android"></i> <span data-i18n="roborock-consumables.label.device"></span></label>
+        <input type="text" id="node-input-device">
+    </div>
+    <div class="form-row">
+        <label for="node-input-threshold"><i class="fa fa-exclamation-triangle"></i> <span data-i18n="roborock-consumables.label.threshold"></span></label>
+        <input type="number" id="node-input-threshold" min="0" max="100" step="1" style="width:80px">
+        <span data-i18n="roborock-consumables.label.percent"></span>
+    </div>
+    <div class="form-tips" data-i18n="roborock-consumables.tip"></div>
+</script>
+
+<script type="text/javascript">
+    RED.nodes.registerType("roborock-consumables", {
+        category: "Roborock",
+        color: "#c0392b",
+        defaults: {
+            name: { value: "" },
+            device: { value: "", type: "roborock-device", required: true },
+            threshold: { value: 10, validate: function (v) { return v === "" || (!isNaN(Number(v)) && Number(v) >= 0 && Number(v) <= 100); } }
+        },
+        inputs: 1,
+        outputs: 2,
+        outputLabels: function (index) {
+            return this._(index === 0 ? "roborock-consumables.outputs.all" : "roborock-consumables.outputs.low");
+        },
+        icon: "roborock.svg",
+        paletteLabel: "consumables",
+        label: function () {
+            return this.name || this._("roborock-consumables.name");
+        },
+        labelStyle: function () {
+            return this.name ? "node_label_italic" : "";
+        }
+    });
+</script>

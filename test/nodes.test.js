@@ -375,37 +375,40 @@ describe("node-red nodes", () => {
     });
 
     test("the device editor has no login form and loads a map only after confirmation", () => {
-        const deviceHtml = fs.readFileSync(path.join(__dirname, "../nodes/roborock-device.html"), "utf8");
-        const vacuumHtml = fs.readFileSync(path.join(__dirname, "../nodes/roborock-vacuum.html"), "utf8");
-        const accountHtml = fs.readFileSync(path.join(__dirname, "../nodes/roborock-account.html"), "utf8");
+        const read = (...parts) => fs.readFileSync(path.join(__dirname, "..", ...parts), "utf8");
+        const deviceHtml = read("nodes/roborock-device.html");
+        const accountHtml = read("nodes/roborock-account.html");
+        const deviceText = JSON.parse(read("nodes/locales/en-US/roborock-device.json"))["roborock-device"];
+        const accountText = JSON.parse(read("nodes/locales/en-US/roborock-account.json"))["roborock-account"];
+        const vacuumHelp = read("nodes/locales/en-US/roborock-vacuum.html");
         assert.equal(deviceHtml.includes("rr-manual-segments"), false);
         assert.equal(deviceHtml.includes("rr-send-code"), false);
         assert.equal(deviceHtml.includes("RED.notify"), false);
         assert.equal(deviceHtml.includes("node-config-input-rooms"), false);
-        assert.equal(deviceHtml.includes(">Load<"), false);
         assert.equal(deviceHtml.includes("readMaps"), false);
-        assert.match(deviceHtml, /Show maps &amp; rooms/);
-        assert.match(deviceHtml, /rooms visible when this map is loaded/);
-        assert.match(deviceHtml, /\{"command":"map_rooms"\}/);
-        assert.match(deviceHtml, />Reload<\/button>/);
-        assert.match(deviceHtml, /Load this map/);
+        assert.equal(deviceText.showMaps, "Show maps & rooms");
+        assert.equal(deviceText.reload, "Reload");
+        assert.equal(deviceText.loadThis, "Load this map");
+        assert.match(deviceText.cachedAt, /^cached at /);
+        assert.match(read("README.md"), /rooms visible when this map is loaded/);
         assert.match(deviceHtml, /showMaps\("reload"\)/);
         assert.match(deviceHtml, /body\.action = "load"/);
         assert.match(deviceHtml, /body\.confirmed = true/);
-        assert.match(deviceHtml, /cached at /);
         const reloadClick = deviceHtml.slice(
-            deviceHtml.indexOf(">Reload</button>"),
-            deviceHtml.indexOf(">Load this map</button>")
+            deviceHtml.indexOf('text(t("reload"))'),
+            deviceHtml.indexOf('text(t("loadThis"))')
         );
+        assert.ok(reloadClick.includes("showMaps"), "the reload button re-reads");
         assert.equal(reloadClick.includes("confirm("), false);
-        assert.match(vacuumHtml, /cached: true/);
-        assert.match(vacuumHtml, /\{"command":"map","mapFlag":1\}/);
-        assert.match(vacuumHtml, /\{"command":"rooms","segments":\[16,17\],"repeat":1\}/);
+        assert.match(vacuumHelp, /cached: true/);
+        assert.match(vacuumHelp, /\{"command":"map_rooms"\}/);
+        assert.match(vacuumHelp, /\{"command":"map","mapFlag":1\}/);
+        assert.match(vacuumHelp, /\{"command":"rooms","segments":\[16,17\],"repeat":1\}/);
         const creds = deviceHtml.slice(deviceHtml.lastIndexOf("credentials:"), deviceHtml.indexOf("label:"));
         assert.equal(creds.includes("userData"), false);
         assert.equal(creds.includes("email"), false);
         assert.match(accountHtml, /nodeId: node.id/);
-        assert.match(accountHtml, /Import Home Assistant session/);
+        assert.equal(accountText.importSession, "Import Home Assistant session");
         assert.match(accountHtml, /rr-account-pass-login/);
     });
 

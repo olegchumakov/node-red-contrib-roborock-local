@@ -1,0 +1,188 @@
+<script type="text/html" data-template-name="roborock-clean-rooms">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="node-red:common.label.name"></span></label>
+        <input type="text" id="node-input-name" data-i18n="[placeholder]node-red:common.label.name">
+    </div>
+    <div class="form-row">
+        <label for="node-input-device"><i class="fa fa-android"></i> <span data-i18n="roborock-clean-rooms.label.device"></span></label>
+        <input type="text" id="node-input-device">
+    </div>
+    <div class="form-row">
+        <label for="node-input-segments"><i class="fa fa-th-large"></i> <span data-i18n="roborock-clean-rooms.label.segments"></span></label>
+        <input type="text" id="node-input-segments" placeholder="16, 17">
+    </div>
+    <div class="form-row">
+        <label for="node-input-mapFlag"><i class="fa fa-map"></i> <span data-i18n="roborock-clean-rooms.label.mapFlag"></span></label>
+        <input type="number" id="node-input-mapFlag" min="0" step="1" style="width:80px" data-i18n="[placeholder]roborock-clean-rooms.label.loadedFloor">
+    </div>
+    <div class="form-row">
+        <label>&nbsp;</label>
+        <button type="button" class="red-ui-button" id="rr-pick-rooms" data-i18n="roborock-clean-rooms.pick"></button>
+    </div>
+    <div class="form-row" id="rr-pick-host" style="display:none">
+        <div id="rr-pick-note" class="form-tips"></div>
+        <div id="rr-pick-list"></div>
+    </div>
+    <div class="form-row">
+        <label for="node-input-names"><i class="fa fa-font"></i> <span data-i18n="roborock-clean-rooms.label.names"></span></label>
+        <input type="text" id="node-input-names" data-i18n="[placeholder]roborock-clean-rooms.label.namesPlaceholder">
+    </div>
+    <div class="form-row">
+        <label for="node-input-repeat"><i class="fa fa-repeat"></i> <span data-i18n="roborock-clean-rooms.label.repeat"></span></label>
+        <select id="node-input-repeat" style="width:80px">
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+        </select>
+    </div>
+    <div class="form-row">
+        <label for="node-input-fan"><i class="fa fa-snowflake-o"></i> <span data-i18n="roborock-clean-rooms.label.fan"></span></label>
+        <select id="node-input-fan">
+            <option value="" data-i18n="roborock-clean-rooms.keep"></option>
+            <option value="silent" data-i18n="roborock-clean-rooms.fan.silent"></option>
+            <option value="balanced" data-i18n="roborock-clean-rooms.fan.balanced"></option>
+            <option value="turbo" data-i18n="roborock-clean-rooms.fan.turbo"></option>
+            <option value="max" data-i18n="roborock-clean-rooms.fan.max"></option>
+            <option value="gentle" data-i18n="roborock-clean-rooms.fan.gentle"></option>
+            <option value="auto" data-i18n="roborock-clean-rooms.fan.auto"></option>
+        </select>
+    </div>
+    <div class="form-row">
+        <label for="node-input-mop"><i class="fa fa-tint"></i> <span data-i18n="roborock-clean-rooms.label.mop"></span></label>
+        <select id="node-input-mop">
+            <option value="" data-i18n="roborock-clean-rooms.keep"></option>
+            <option value="off" data-i18n="roborock-clean-rooms.mop.off"></option>
+            <option value="low" data-i18n="roborock-clean-rooms.mop.low"></option>
+            <option value="medium" data-i18n="roborock-clean-rooms.mop.medium"></option>
+            <option value="high" data-i18n="roborock-clean-rooms.mop.high"></option>
+        </select>
+    </div>
+    <div class="form-tips" data-i18n="roborock-clean-rooms.tip"></div>
+</script>
+
+<script type="text/javascript">
+    RED.nodes.registerType("roborock-clean-rooms", {
+        category: "Roborock",
+        color: "#c0392b",
+        defaults: {
+            name: { value: "" },
+            device: { value: "", type: "roborock-device", required: true },
+            segments: { value: "", validate: function (v) { return v === "" || /^\s*\d+(\s*,\s*\d+)*\s*$/.test(v); } },
+            names: { value: "" },
+            mapFlag: { value: "", validate: function (v) { return v === "" || (!isNaN(Number(v)) && Number(v) >= 0); } },
+            repeat: { value: "1" },
+            fan: { value: "" },
+            mop: { value: "" }
+        },
+        inputs: 1,
+        outputs: 1,
+        outputLabels: function () { return this._("roborock-clean-rooms.output"); },
+        icon: "roborock.svg",
+        paletteLabel: "clean rooms",
+        label: function () {
+            if (this.name) {
+                return this.name;
+            }
+            const what = this.names || this.segments;
+            return what ? this._("roborock-clean-rooms.labelWith", { rooms: what }) : this._("roborock-clean-rooms.name");
+        },
+        labelStyle: function () {
+            return this.name ? "node_label_italic" : "";
+        },
+        oneditprepare: function () {
+            const node = this;
+            let busy = false;
+
+            function selectedIds() {
+                return String($("#node-input-segments").val() || "").split(",").map(function (item) {
+                    return item.trim();
+                }).filter(Boolean);
+            }
+            function writeIds(ids) {
+                $("#node-input-segments").val(ids.join(", "));
+            }
+            function label(segment) {
+                return segment.name ? (segment.segmentId + " " + segment.name) : String(segment.segmentId);
+            }
+            function noteText(note) {
+                const known = {
+                    "rooms visible when this map is loaded": "whenLoaded",
+                    "This map has no room mapping. Rooms must be named in the Roborock app at least once; until then the robot reports none.": "noMapping",
+                    "Room mapping could not be read for this map.": "unreadable"
+                };
+                return known[note] ? node._("roborock-clean-rooms.notes." + known[note]) : (note || "");
+            }
+            function render(data) {
+                const host = $("#rr-pick-list").empty();
+                const maps = data.maps || [];
+                if (!maps.length) {
+                    host.append($("<div class='form-tips'></div>").text(data.mapsError || node._("roborock-clean-rooms.noMaps")));
+                }
+                const chosen = selectedIds();
+                const chosenFlag = $("#node-input-mapFlag").val();
+                maps.forEach(function (map) {
+                    const block = $("<div style='margin:6px 0'></div>");
+                    const title = (map.name || ("Map " + map.mapFlag)) + " · " + map.mapFlag + (map.current ? " (" + node._("roborock-clean-rooms.loaded") + ")" : "");
+                    block.append($("<div></div>").text(title));
+                    if (!map.segments || !map.segments.length) {
+                        block.append($("<div class='form-tips'></div>").text(noteText(map.note)));
+                    }
+                    (map.segments || []).forEach(function (segment) {
+                        const id = String(segment.segmentId);
+                        const box = $("<input type='checkbox' style='width:auto;margin:0 6px 0 0;vertical-align:middle'>");
+                        box.prop("checked", chosen.indexOf(id) !== -1 && (chosenFlag === "" ? map.current : String(map.mapFlag) === String(chosenFlag)));
+                        box.on("change", function () {
+                            let ids = selectedIds();
+                            const flag = String(map.mapFlag);
+                            const current = $("#node-input-mapFlag").val();
+                            const sameFloor = current === flag || (current === "" && map.current);
+                            if (!sameFloor) {
+                                ids = [];
+                                $("#rr-pick-list input[type=checkbox]").not(box).prop("checked", false);
+                            }
+                            $("#node-input-mapFlag").val(flag);
+                            ids = ids.filter(function (item) { return item !== id; });
+                            if (box.prop("checked")) {
+                                ids.push(id);
+                            }
+                            writeIds(ids);
+                        });
+                        const row = $("<label style='display:block;width:auto;margin:2px 0'></label>");
+                        row.append(box).append($("<span></span>").text(label(segment)));
+                        block.append(row);
+                    });
+                    host.append(block);
+                });
+            }
+            $("#rr-pick-rooms").on("click", function () {
+                if (busy) {
+                    return;
+                }
+                const deviceId = $("#node-input-device").val();
+                if (!deviceId || deviceId === "_ADD_") {
+                    $("#rr-pick-host").show();
+                    $("#rr-pick-note").text(node._("roborock-clean-rooms.pickDevice"));
+                    return;
+                }
+                busy = true;
+                $("#rr-pick-host").show();
+                $("#rr-pick-note").text(node._("roborock-clean-rooms.reading"));
+                $.ajax({
+                    url: "roborock-local/map-rooms",
+                    type: "POST",
+                    contentType: "application/json; charset=UTF-8",
+                    data: JSON.stringify({ nodeId: deviceId, action: "read" }),
+                    dataType: "json"
+                }).done(function (data) {
+                    $("#rr-pick-note").text(data.mappingError ? node._("roborock-clean-rooms.partial") : "");
+                    render(data);
+                }).fail(function (xhr) {
+                    $("#rr-pick-list").empty();
+                    $("#rr-pick-note").text((xhr.responseJSON && xhr.responseJSON.error) || node._("roborock-clean-rooms.failed"));
+                }).always(function () {
+                    busy = false;
+                });
+            });
+        }
+    });
+</script>

@@ -1,0 +1,15 @@
+<script type="text/html" data-help-name="roborock-consumables">
+    <p>Читает износ основной щётки, боковой щётки, фильтра и датчиков.</p>
+    <h3>Входы</h3>
+    <p>Любое сообщение запускает чтение. Для ежедневной проверки поставьте перед нодой inject с повтором.</p>
+    <h3>Выходы</h3>
+    <ol class="node-ports">
+        <li>Все детали. <code>msg.kind</code> = <code>consumables</code>, входящий <code>msg.topic</code> сохраняется. В <code>msg.payload.parts</code> — <code>mainBrush</code>, <code>sideBrush</code>, <code>filter</code>, <code>sensor</code> (те, что сообщает робот), у каждой <code>usedHours</code>, <code>remainingHours</code> и <code>remainingPercent</code>. <code>msg.payload.raw</code> — неизменённый ответ, <code>msg.low</code> — детали, у которых остаток не выше порога.</li>
+        <li>Изношенные детали. Отправляется только если остаток какой-то детали не выше порога. <code>msg.payload</code> — список имён деталей, <code>msg.kind</code> = <code>consumables-low</code>.</li>
+    </ol>
+    <h3>Подробности</h3>
+    <ul>
+        <li>Ресурс: основная щётка 300 ч, боковая 200 ч, фильтр 150 ч, датчики 30 ч.</li>
+        <li>«Предупреждать при» — процент оставшегося ресурса; 0 выключает предупреждение.</li>
+    </ul>
+</script>

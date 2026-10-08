@@ -1,0 +1,18 @@
+<script type="text/html" data-help-name="roborock-status">
+    <p>Reports what the robot is doing and tells you when that changes.</p>
+    <h3>Inputs</h3>
+    <p>Any message reads the status now and sends it on output 1, even if nothing changed.</p>
+    <h3>Outputs</h3>
+    <ol class="node-ports">
+        <li>Status. <code>msg.kind</code> is <code>status</code> and the incoming <code>msg.topic</code> is kept. <code>msg.payload</code> has <code>stateName</code> (cleaning, returning, charging, idle, paused, error, ...), <code>battery</code>, <code>errorName</code>, <code>fanName</code> and <code>cleanAreaM2</code>. With <i>only when it changes</i> on, changes of state, battery, error, fan and map are sent.</li>
+        <li>Events. <code>msg.payload</code> and <code>msg.event</code> are the event name, <code>msg.kind</code> is <code>event</code>, and <code>msg.status</code> is the status. Events are not replies, so they carry no incoming message.</li>
+    </ol>
+    <h3>Details</h3>
+    <ul>
+        <li><code>cleaning-started</code>, <code>paused</code>, <code>resumed</code>, <code>error</code>, <code>error-cleared</code>. A resume is not a new start.</li>
+        <li><code>cleaning-finished</code> is sent when the robot's <code>in_cleaning</code> flag drops to 0. The flag stays set while paused, but the robot clears it as soon as it is sent home, so the event fires when the return to the dock starts, not when the robot has docked.</li>
+        <li><code>low-battery</code> is sent once when the level drops to the set value, and again only after it has climbed above it.</li>
+        <li>Events compare each sample with the previous one, so the first sample after a deploy sends none.</li>
+        <li>Poll is in seconds. Nodes on one device share one connection, and the shortest poll wins.</li>
+    </ul>
+</script>

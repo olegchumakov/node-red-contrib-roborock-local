@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.3.0
+
+- New dedicated nodes: **command**, **status**, **clean rooms**, **settings**, **maps**, and **consumables**. They share the existing **roborock device** and its one TCP connection. **vacuum** stays as the universal node for any shorthand or raw `{"method","params"}`, including new or undocumented commands.
+- **status** sends events on a second output: `cleaning-started`, `cleaning-finished`, `error`, `error-cleared`, and a one-shot `low-battery`. Any input message reads the status on demand.
+- **clean rooms** picks rooms and the floor from the robot in the editor, switches floors first when needed (refused while the robot is cleaning), and can set repeats, fan, and mop.
+- **command** only accepts plain actions, so a typo is rejected instead of being sent to the robot as an RPC method.
+- **consumables** reports percent left per wear part and has a separate output for worn parts.
+- Every node keeps the incoming message on its output (`msg.topic` and your own properties pass through). This includes **vacuum**, which used to start a new message.
+- After a failed command the node status line returns to the robot's last known state after a few seconds instead of staying red.
+- The new nodes have English and Russian editor text and help.
+- Loading a floor moved into `lib/floor.js`; the device editor behaves as before. A floor that is already loaded is only re-read: `load_multi_map` is not sent.
+- Auto protocol no longer trusts the account's `pv`. It tries the version that worked last time, else the account `pv`, else 1.0, and then the other one, and remembers the working version per device in `roborock-local-protocol-cache.json` in the Node-RED user directory. Some firmware (an S8 Pro Ultra, `roborock.vacuum.a51`) reports 1.0 in the cloud but answers only L01 on the LAN. A forced protocol is not second-guessed.
+- The `fan` and `mop` shorthand on **vacuum** now send one-element lists (`[103]`, `[202]`), as the settings and clean rooms nodes do. A bare number was ignored for fan and refused for mop (`Params is not an Array (-10007)`).
+- **clean rooms**: `msg.payload` names rooms only when it is an array or an object with `segments`, `rooms`, or `names`. A number, string, or boolean (such as the default inject timestamp) can no longer replace the rooms set on the node. `msg.rooms` is accepted as another name for `msg.segments`.
+- **status** and **consumables** keep the incoming `msg.topic`. What the message is goes in `msg.kind` (`status`, `event`, `consumables`, `consumables-low`); events also have `msg.event`. Events never carry an incoming message, and overlapping on-demand reads each answer their own message.
+- **status** events follow the robot's `in_cleaning` flag. A pause is `paused`, a resume is `resumed` (not a new `cleaning-started`), and `cleaning-finished` is sent when `in_cleaning` drops to 0, not on a pause. The robot clears that flag as soon as it is sent home, so it fires when the return starts, not when the robot has docked.
+- **command**: a `dock` refused as `action locked (-10003)` (right after a pause) is retried once after about 12 seconds; `msg.retried` is `true`.
+- Errors say what is missing on the device (IP, local key, both, or no device selected), and so does the node status line.
+- Help, editor tips and README rewritten to say what the nodes do. Every node's help has the same shape (one-line purpose, Inputs, Outputs, Details; Fields and Details for the two config nodes). The README leads with the dedicated nodes and presents **vacuum** as the universal, advanced node. The Russian section matches. miIO, port 54321 and model-specific framing (S7 fan codes, "S7 and most robots", `Downstairs S7`) are gone: fan names are described as custom modes 101-106 on most current models with a number for older firmware, and the protocol options are `Auto (recommended)`, `1.0` and `L01`, with the note that some models (for example the S8 Pro Ultra) speak only L01 locally even when the cloud says 1.0. Discovery notes are short (Find on LAN listens about 8 seconds on UDP 58866; otherwise type the IP).
+- **vacuum**, **roborock device** and **roborock account** now have Russian help, and their editor labels, tips and messages are translated, so the editor is fully bilingual. Their help moved from the node file to `nodes/locales/<lang>/`. The device editor's buttons read `Fetch devices from account`, `Find on LAN`, `Show maps & rooms`, `Reload` and `Load this map` in English and the Russian equivalents in Russian.
+- The keepalive PING is now sent at least every half of the keepalive the client announces in CONNECT (5 s of 10 s). It used to go out every 10 s, exactly at the moment a robot that enforces its keepalive may close a quiet link, which showed up as a reconnect every 10-11 s on a cold Auto start (after the 1.0 attempts, when nothing else is sent). The ping timer is also stopped as soon as a socket is lost, and a socket that fails to decode is now reconnected instead of being left dead. The "connection lost" line says how long the link lived and on which protocol.
+- A fake robot that answers only L01 and closes the link on a frame of the wrong version or on silence past its keepalive now covers a cold Auto connect in the tests. More than 10 nodes on one device no longer print a `MaxListenersExceededWarning`.
+- Documented: rooms must be named in the Roborock app at least once, otherwise `get_room_mapping` is `[]` and no rooms are listed. The room picker's no-rooms note says so too.
+
 ## 0.2.2
 
 - **Show maps & rooms** has **Reload** on the loaded floor. It re-reads `get_room_mapping` and cloud room names and refreshes the saved copy. It does not change the robot and does not ask for confirmation.

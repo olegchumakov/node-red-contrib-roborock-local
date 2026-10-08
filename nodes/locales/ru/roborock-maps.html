@@ -1,0 +1,22 @@
+<script type="text/html" data-help-name="roborock-maps">
+    <p>Показывает этажи и id комнат или переключает активный этаж.</p>
+    <h3>Входы</h3>
+    <dl class="message-properties">
+        <dt class="optional">action <span class="property-type">string</span></dt>
+        <dd><code>read</code> или <code>load</code>. Также читается из <code>msg.payload.action</code>.</dd>
+        <dt class="optional">mapFlag <span class="property-type">number</span></dt>
+        <dd>Этаж для загрузки. Также читается из <code>msg.payload.mapFlag</code>.</dd>
+    </dl>
+    <h3>Выходы</h3>
+    <dl class="message-properties">
+        <dt>payload</dt>
+        <dd><code>{currentMapFlag, maps:[{name, mapFlag, current, segments:[{segmentId, name?}]}]}</code>, тот же список, что <b>Показать карты и комнаты</b> в устройстве. У незагруженного этажа показаны ранее сохранённые комнаты с <code>cached</code> и <code>cachedAt</code>.</dd>
+    </dl>
+    <h3>Подробности</h3>
+    <ul>
+        <li><b>read</b> робота не меняет.</li>
+        <li><b>load</b> отправляет <code>load_multi_map</code>, читает комнаты нового этажа и запоминает их. Он меняет активный этаж робота и отклоняется, пока робот убирает. Уже загруженный этаж только перечитывается.</li>
+        <li><b>Назовите комнаты в приложении Roborock хотя бы раз.</b> Безымянные комнаты робот не сообщает, поэтому до этого их в списке нет, даже на загруженном этаже.</li>
+        <li>Комнаты незагруженного этажа берутся из сохранённой копии. Чтобы они появились, один раз загрузите этот этаж.</li>
+    </ul>
+</script>

@@ -1,0 +1,45 @@
+<script type="text/html" data-template-name="roborock-command">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="node-red:common.label.name"></span></label>
+        <input type="text" id="node-input-name" data-i18n="[placeholder]node-red:common.label.name">
+    </div>
+    <div class="form-row">
+        <label for="node-input-device"><i class="fa fa-android"></i> <span data-i18n="roborock-command.label.device"></span></label>
+        <input type="text" id="node-input-device">
+    </div>
+    <div class="form-row">
+        <label for="node-input-action"><i class="fa fa-play"></i> <span data-i18n="roborock-command.label.action"></span></label>
+        <select id="node-input-action">
+            <option value="start" data-i18n="roborock-command.actions.start"></option>
+            <option value="pause" data-i18n="roborock-command.actions.pause"></option>
+            <option value="stop" data-i18n="roborock-command.actions.stop"></option>
+            <option value="dock" data-i18n="roborock-command.actions.dock"></option>
+            <option value="find" data-i18n="roborock-command.actions.find"></option>
+            <option value="spot" data-i18n="roborock-command.actions.spot"></option>
+        </select>
+    </div>
+    <div class="form-tips" data-i18n="roborock-command.tip"></div>
+</script>
+
+<script type="text/javascript">
+    RED.nodes.registerType("roborock-command", {
+        category: "Roborock",
+        color: "#c0392b",
+        defaults: {
+            name: { value: "" },
+            device: { value: "", type: "roborock-device", required: true },
+            action: { value: "start" }
+        },
+        inputs: 1,
+        outputs: 1,
+        outputLabels: function () { return this._("roborock-command.output"); },
+        icon: "roborock.svg",
+        paletteLabel: "command",
+        label: function () {
+            return this.name || this._("roborock-command.actions." + (this.action || "start"));
+        },
+        labelStyle: function () {
+            return this.name ? "node_label_italic" : "";
+        }
+    });
+</script>

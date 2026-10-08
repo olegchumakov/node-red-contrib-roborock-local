@@ -1,0 +1,17 @@
+{
+    "roborock-maps": {
+        "name": "maps & rooms",
+        "loadLabel": "load map __mapFlag__",
+        "label": {
+            "device": "Device",
+            "action": "Action",
+            "mapFlag": "Map flag"
+        },
+        "actions": {
+            "read": "read maps and rooms",
+            "load": "load a floor"
+        },
+        "output": "maps",
+        "tip": "Read lists floors and room ids without changing the robot. Load switches the active floor, then reads and remembers its rooms. Load is refused while the robot is cleaning."
+    }
+}

@@ -1,6 +1,6 @@
 {
   "name": "node-red-contrib-roborock-local",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Node-RED nodes for local LAN control of Roborock vacuums, with a built-in Roborock account login to fetch device keys.",
   "keywords": [
     "node-red",
@@ -41,7 +41,13 @@
     "nodes": {
       "roborock-account": "nodes/roborock-account.js",
       "roborock-device": "nodes/roborock-device.js",
-      "roborock-vacuum": "nodes/roborock-vacuum.js"
+      "roborock-vacuum": "nodes/roborock-vacuum.js",
+      "roborock-command": "nodes/roborock-command.js",
+      "roborock-status": "nodes/roborock-status.js",
+      "roborock-clean-rooms": "nodes/roborock-clean-rooms.js",
+      "roborock-settings": "nodes/roborock-settings.js",
+      "roborock-maps": "nodes/roborock-maps.js",
+      "roborock-consumables": "nodes/roborock-consumables.js"
     }
   },
   "scripts": {

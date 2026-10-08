@@ -67,6 +67,7 @@ describe("maps and protocol selection", () => {
     test("empty mapping does not claim lab_status means missing room splits", () => {
         const warning = emptySegmentWarning({ mapName: "1 этаж" });
         assert.equal(warning, NO_ROOM_MAPPING);
+        assert.match(NO_ROOM_MAPPING, /named in the Roborock app/);
         assert.equal(warning.includes("lab_status"), false);
         assert.equal(warning.includes("unsave_map_flag"), false);
         assert.equal(warning.includes("often means"), false);
@@ -278,15 +279,21 @@ describe("maps and protocol selection", () => {
         assert.equal(resolveCommand({ command: "maps" }).method, "get_multi_maps_list");
     });
 
-    test("auto with pv 1.0 skips L01, forced L01 does not", () => {
+    test("auto tries the account pv first and then the other version, forced L01 does not", () => {
         const auto = new RoborockClient({
             host: "127.0.0.1",
             localKey: "key",
             protocol: "auto",
             knownProtocol: "1.0"
         });
-        assert.deepEqual(auto.versionsToTry(), ["1.0"]);
+        assert.deepEqual(auto.versionsToTry(), ["1.0", "L01"]);
         auto.close();
+        const l01 = new RoborockClient({ host: "127.0.0.1", localKey: "key", protocol: "auto", knownProtocol: "L01" });
+        assert.deepEqual(l01.versionsToTry(), ["L01", "1.0"]);
+        l01.close();
+        const forced10 = new RoborockClient({ host: "127.0.0.1", localKey: "key", protocol: "1.0", knownProtocol: "L01" });
+        assert.deepEqual(forced10.versionsToTry(), ["1.0"]);
+        forced10.close();
         const forced = new RoborockClient({
             host: "127.0.0.1",
             localKey: "key",

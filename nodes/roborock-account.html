@@ -1,65 +1,53 @@
 <script type="text/html" data-template-name="roborock-account">
     <div class="form-row">
-        <label for="node-config-input-name"><i class="fa fa-tag"></i> Name</label>
-        <input type="text" id="node-config-input-name" placeholder="Roborock account">
+        <label for="node-config-input-name"><i class="fa fa-tag"></i> <span data-i18n="node-red:common.label.name"></span></label>
+        <input type="text" id="node-config-input-name" data-i18n="[placeholder]roborock-account.placeholder.name">
     </div>
     <div class="form-row">
-        <label for="node-config-input-email"><i class="fa fa-envelope"></i> Email</label>
+        <label for="node-config-input-email"><i class="fa fa-envelope"></i> <span data-i18n="roborock-account.label.email"></span></label>
         <input type="text" id="node-config-input-email" placeholder="you@example.com" autocomplete="off">
     </div>
     <div class="form-row">
-        <label for="node-config-input-region"><i class="fa fa-globe"></i> Region</label>
+        <label for="node-config-input-region"><i class="fa fa-globe"></i> <span data-i18n="roborock-account.label.region"></span></label>
         <select id="node-config-input-region" style="width:70%">
-            <option value="auto">Auto-detect from the email</option>
-            <option value="ru">Russia — ruiot.roborock.com</option>
-            <option value="eu">Europe — euiot.roborock.com</option>
-            <option value="us">United States — usiot.roborock.com</option>
-            <option value="cn">China — cniot.roborock.com</option>
+            <option value="auto" data-i18n="roborock-account.region.auto"></option>
+            <option value="ru" data-i18n="roborock-account.region.ru"></option>
+            <option value="eu" data-i18n="roborock-account.region.eu"></option>
+            <option value="us" data-i18n="roborock-account.region.us"></option>
+            <option value="cn" data-i18n="roborock-account.region.cn"></option>
         </select>
     </div>
     <div class="form-row">
-        <label for="node-config-input-baseUrl"><i class="fa fa-link"></i> Cloud URL</label>
-        <input type="text" id="node-config-input-baseUrl" placeholder="filled after auto-detect">
+        <label for="node-config-input-baseUrl"><i class="fa fa-link"></i> <span data-i18n="roborock-account.label.baseUrl"></span></label>
+        <input type="text" id="node-config-input-baseUrl" data-i18n="[placeholder]roborock-account.placeholder.baseUrl">
     </div>
-    <div class="form-tips">Leave the URL empty unless auto-detect picked the wrong server. It must be an https://*.roborock.com address.</div>
+    <div class="form-tips" data-i18n="roborock-account.tipUrl"></div>
     <div class="form-row">
-        <button type="button" class="red-ui-button" id="rr-account-send">Send code</button>
-        <input type="text" id="rr-account-code" placeholder="email code" style="width:30%" autocomplete="off">
-        <button type="button" class="red-ui-button" id="rr-account-code-login">Log in with code</button>
-    </div>
-    <div class="form-row">
-        <input type="password" id="rr-account-password" placeholder="password (optional)" style="width:50%" autocomplete="new-password">
-        <button type="button" class="red-ui-button" id="rr-account-pass-login">Log in with password</button>
+        <button type="button" class="red-ui-button" id="rr-account-send" data-i18n="roborock-account.sendCode"></button>
+        <input type="text" id="rr-account-code" data-i18n="[placeholder]roborock-account.placeholder.code" style="width:30%" autocomplete="off">
+        <button type="button" class="red-ui-button" id="rr-account-code-login" data-i18n="roborock-account.loginCode"></button>
     </div>
     <div class="form-row">
-        <label for="rr-account-import"><i class="fa fa-paste"></i> Home Assistant session</label>
-        <textarea id="rr-account-import" rows="3" style="width:70%" placeholder="Paste Home Assistant user_data JSON" autocomplete="off"></textarea>
+        <input type="password" id="rr-account-password" data-i18n="[placeholder]roborock-account.placeholder.password" style="width:50%" autocomplete="new-password">
+        <button type="button" class="red-ui-button" id="rr-account-pass-login" data-i18n="roborock-account.loginPassword"></button>
     </div>
     <div class="form-row">
-        <button type="button" class="red-ui-button" id="rr-account-import-btn">Import Home Assistant session</button>
+        <label for="rr-account-import"><i class="fa fa-paste"></i> <span data-i18n="roborock-account.label.haSession"></span></label>
+        <textarea id="rr-account-import" rows="3" style="width:70%" data-i18n="[placeholder]roborock-account.placeholder.haSession" autocomplete="off"></textarea>
     </div>
-    <div class="form-tips" id="rr-account-status">Sign in here, or paste a Home Assistant session. Click Done, then fetch devices on the vacuum. You do not need to deploy in between. The session stays in credentials, not in the flow file, and is not written to the log.</div>
+    <div class="form-row">
+        <button type="button" class="red-ui-button" id="rr-account-import-btn" data-i18n="roborock-account.importSession"></button>
+    </div>
+    <div class="form-tips" id="rr-account-status" data-i18n="roborock-account.tip"></div>
     <input type="password" id="node-config-input-userData" style="display:none" autocomplete="off">
     <input type="hidden" id="node-config-input-clientId">
 </script>
 
-<script type="text/html" data-help-name="roborock-account">
-    <p>Signs in to a Roborock account so <code>roborock-device</code> can download the vacuum's DUID and <code>local_key</code>. Day-to-day control does not use the cloud.</p>
-    <h3>Steps</h3>
-    <ol>
-        <li>Enter the email address from the Roborock app. Pick Russia, Europe, US, or China if auto-detect fails. Russia is <code>https://ruiot.roborock.com</code>.</li>
-        <li>Click <b>Send code</b>, then enter the code from the email. Password login is also available for older accounts.</li>
-        <li>Or paste <code>user_data</code> from Home Assistant (<code>.storage/core.config_entries</code>, the roborock entry) and click <b>Import Home Assistant session</b>. Include <code>base_url</code> by pasting the whole entry when you can. The JSON is validated and not logged.</li>
-        <li>Click <b>Done</b>. Open the Roborock device node and click <b>Fetch devices from account</b>. Deploy once after the vacuum fields are filled. A deploy is not required between sign-in and the fetch.</li>
-    </ol>
-    <p>IP, DUID, <code>localKey</code>, and model live on the device node's credentials, not in this account node and not in the flow file.</p>
-    <h3>When the key changes</h3>
-    <p><code>local_key</code> changes after the robot is removed and added again, or after a Wi-Fi reset. Sign in and fetch devices again, then deploy. Commands that time out or fail to decrypt usually mean the stored key is stale.</p>
-    <p>This package is unofficial and is not affiliated with Roborock.</p>
-</script>
-
 <script type="text/javascript">
 (function () {
+    function t(key, options) {
+        return RED._("roborock-account." + key, options);
+    }
     function postJSON(url, body) {
         return $.ajax({
             url: url,
@@ -85,7 +73,7 @@
             userData: { type: "password" }
         },
         label: function () {
-            return this.name || this.credentials && this.credentials.email || "roborock account";
+            return this.name || this.credentials && this.credentials.email || this._("roborock-account.name");
         },
         oneditprepare: function () {
             const node = this;
@@ -115,48 +103,48 @@
                 }
             }
             $("#rr-account-send").on("click", function () {
-                setStatus("Requesting a verification code...");
+                setStatus(t("requesting"));
                 postJSON("roborock-local/send-code", payload()).done(function (data) {
                     remember(data);
-                    setStatus(data.message || "Code sent.");
+                    setStatus(data.message || t("codeSent"));
                 }).fail(function (xhr) {
-                    setStatus((xhr.responseJSON && xhr.responseJSON.error) || "Could not send the code", true);
+                    setStatus((xhr.responseJSON && xhr.responseJSON.error) || t("sendFailed"), true);
                 });
             });
             $("#rr-account-code-login").on("click", function () {
-                setStatus("Signing in...");
+                setStatus(t("signingIn"));
                 postJSON("roborock-local/login", Object.assign(payload(), { code: $("#rr-account-code").val() }))
                     .done(function (data) {
                         remember(data);
-                        setStatus((data.message || "Signed in.") + " Click Done, then fetch devices on the vacuum. Deploy is not required yet.");
+                        setStatus((data.message || t("signedIn")) + " " + t("next"));
                     })
                     .fail(function (xhr) {
-                        setStatus((xhr.responseJSON && xhr.responseJSON.error) || "Login failed", true);
+                        setStatus((xhr.responseJSON && xhr.responseJSON.error) || t("loginFailed"), true);
                     });
             });
             $("#rr-account-import-btn").on("click", function () {
                 const pasted = $("#rr-account-import").val();
-                setStatus("Checking the imported session...");
+                setStatus(t("checking"));
                 postJSON("roborock-local/import-session", Object.assign(payload(), { userData: pasted }))
                     .done(function (data) {
                         $("#rr-account-import").val("");
                         remember(data);
-                        setStatus((data.message || "Session imported.") + " Click Done, then fetch devices on the vacuum. Deploy is not required yet.");
+                        setStatus((data.message || t("imported")) + " " + t("next"));
                     })
                     .fail(function (xhr) {
-                        setStatus((xhr.responseJSON && xhr.responseJSON.error) || "Could not import that session", true);
+                        setStatus((xhr.responseJSON && xhr.responseJSON.error) || t("importFailed"), true);
                     });
             });
             $("#rr-account-pass-login").on("click", function () {
-                setStatus("Signing in with password...");
+                setStatus(t("signingInPassword"));
                 postJSON("roborock-local/login", Object.assign(payload(), { password: $("#rr-account-password").val() }))
                     .done(function (data) {
                         remember(data);
                         $("#rr-account-password").val("");
-                        setStatus((data.message || "Signed in.") + " Click Done, then fetch devices on the vacuum. Deploy is not required yet.");
+                        setStatus((data.message || t("signedIn")) + " " + t("next"));
                     })
                     .fail(function (xhr) {
-                        setStatus((xhr.responseJSON && xhr.responseJSON.error) || "Login failed", true);
+                        setStatus((xhr.responseJSON && xhr.responseJSON.error) || t("loginFailed"), true);
                     });
             });
         },

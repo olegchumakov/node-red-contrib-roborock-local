@@ -1,0 +1,26 @@
+<script type="text/html" data-help-name="roborock-clean-rooms">
+    <p>Убирает выбранные комнаты, при необходимости на выбранном этаже и с выбранной мощностью и мойкой.</p>
+    <h3>Входы</h3>
+    <p>Любое сообщение запускает уборку по настройкам ноды. Их заменяют свойства:</p>
+    <dl class="message-properties">
+        <dt class="optional">segments <span class="property-type">array | string</span></dt>
+        <dd>Id комнат, например <code>[16, 17]</code> или <code>"16,17"</code>. Также принимается <code>msg.rooms</code>.</dd>
+        <dt class="optional">names <span class="property-type">array | string</span></dt>
+        <dd>Имена комнат. Имя должно совпасть ровно с одной комнатой на убираемом этаже. <code>"16"</code> и <code>"Room 16"</code> — это id 16.</dd>
+        <dt class="optional">mapFlag, repeat, fan, mop</dt>
+        <dd>Этаж, число повторов (1–3), мощность, мойка. Те же ключи работают внутри объекта <code>msg.payload</code>.</dd>
+        <dt class="optional">payload <span class="property-type">array | object</span></dt>
+        <dd>Задаёт комнаты, только если это сказано прямо: массив (числа — id, текст — имена) или объект с <code>segments</code>, <code>rooms</code> или <code>names</code>. Число, строка или булево значение (например, метка времени от inject по умолчанию) игнорируется.</dd>
+    </dl>
+    <h3>Выходы</h3>
+    <dl class="message-properties">
+        <dt>payload</dt><dd>ответ робота на <code>app_segment_clean</code></dd>
+        <dt>segments</dt><dd>отправленные id комнат</dd>
+        <dt>floorSwitched</dt><dd>менялся ли этаж перед уборкой</dd>
+    </dl>
+    <h3>Подробности</h3>
+    <ul>
+        <li><b>Выбрать комнаты с робота</b> показывает комнаты задеплоенного устройства. Робот сообщает комнату только после того, как её хотя бы раз назвали в приложении Roborock.</li>
+        <li>Id комнат повторяются на разных этажах, поэтому этаж хранится вместе с комнатами. Если этаж задан, а загружен другой, нода сначала загрузит его. Пока робот убирает, она откажет, а если этаж не переключился, ничего не уберёт. Уже загруженный этаж повторно не грузится. Если этаж пуст, убирается загруженный.</li>
+    </ul>
+</script>
