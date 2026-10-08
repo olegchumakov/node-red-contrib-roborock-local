@@ -137,7 +137,7 @@ All nodes use one **roborock device** (and share one TCP connection to the robot
 
 ### status events
 
-A clean is in progress while the robot is cleaning or paused, or while its `in_cleaning` flag is set. The flag stays set while paused and while returning to the dock. It is 1 for a full clean and 3 while a segment clean is paused (any value above 0 counts). So `paused` and `resumed` are their own events, a resume is not a new `cleaning-started`, and `cleaning-finished` is sent only when the clean really ends (idle, charging, or returning with `in_cleaning` back at 0). When a sample has no `in_cleaning` (a pushed state change), the state alone decides, and the next poll corrects it. Set a poll interval so the end of a clean is seen even when no message arrives.
+A clean is in progress while the robot is cleaning or paused, or while its `in_cleaning` flag is set. The flag stays set while paused. It is 1 for a full clean and 3 while a segment clean is paused (any value above 0 counts). The robot clears it as soon as it is sent home, or starts heading back by itself, so `cleaning-finished` fires when the return to the dock starts, not when it has docked or is charging. `paused` and `resumed` are their own events, and a resume is not a new `cleaning-started`. When a sample has no `in_cleaning` (a pushed state change), the state alone decides, and the next poll corrects it. Set a poll interval so the end of a clean is seen even when no message arrives.
 
 Output 1 has `msg.kind = "status"`. Output 2 has `msg.payload` and `msg.event` set to the event name, `msg.kind = "event"`, and the status in `msg.status`. Events come from the change between two samples, not from a reply to one message, so they do not carry an incoming message. The status output does: a message on the input is answered with its own `msg.topic` and properties, and several overlapping reads each answer their own message.
 
@@ -190,7 +190,7 @@ Fan names `silent`, `balanced`, `turbo`, `max`, `gentle`, and `auto` map to S7-s
 
 The node status line shows the same idea, for example `charging 87%` or `cleaning 42%`.
 
-One TCP connection is shared by every vacuum node that points at the same device. It reconnects with backoff, matches RPC ids, sends a keepalive, and closes the socket on redeploy.
+One TCP connection is shared by every vacuum node that points at the same device. It reconnects with backoff, matches RPC ids, sends a keepalive (a PING at least every half of the 10 s keepalive it announces), and closes the socket on redeploy.
 
 ## Check a real robot
 

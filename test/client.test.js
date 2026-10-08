@@ -7,7 +7,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { RoborockClient } = require("../lib/client");
-const { FrameDecoder, encodeControl, encodeDataFrame, decryptFrame } = require("../lib/frame");
+const { FrameDecoder, encodeConnect, encodeControl, encodeDataFrame, decryptFrame } = require("../lib/frame");
 const { decodeRpcPayload, encodeRpcResponse } = require("../lib/commands");
 const { PROTOCOL } = require("../lib/constants");
 const { resetForTests } = require("../lib/session");
@@ -200,6 +200,114 @@ describe("local client", () => {
         } finally {
             second.close();
             await v10.close();
+        }
+    });
+
+    test("a cold auto connect that falls back to L01 keeps the link up on L01 only", async () => {
+        const memory = protocolMemory(fs.mkdtempSync(path.join(os.tmpdir(), "rr-proto-")), "DUID-COLD");
+        const mock = await startVersionMock(undefined, { versions: ["L01"], strict: true, idleCloseMs: 900 });
+        const client = new RoborockClient({
+            host: "127.0.0.1",
+            port: mock.port,
+            localKey: LOCAL_KEY,
+            knownProtocol: "1.0",
+            protocolMemory: memory,
+            keepAliveSeconds: 1,
+            pingIntervalMs: 1000,
+            helloTimeoutMs: 150,
+            requestTimeoutMs: 1000
+        });
+        let drops = 0;
+        client.on("disconnect", () => {
+            drops += 1;
+        });
+        try {
+            assert.equal((await client.request("get_status", []))[0].battery, 87);
+            assert.equal(client.version, "L01");
+            assert.equal(mock.openSockets(), 1, "the sockets of the failed 1.0 hellos are gone");
+            await new Promise((resolve) => setTimeout(resolve, 2600));
+            assert.equal(drops, 0, `the robot closed the link: ${mock.closures.join(", ")}`);
+            assert.deepEqual(mock.closures, []);
+            assert.ok(mock.pings >= 3, `pings sent: ${mock.pings}`);
+            assert.equal((await client.request("get_status", []))[0].battery, 87);
+            assert.equal(mock.openSockets(), 1);
+        } finally {
+            client.close();
+            await mock.close();
+        }
+    });
+
+    test("the fake robot really closes a link that uses the wrong version or goes quiet", async () => {
+        const mock = await startVersionMock(undefined, { versions: ["L01"], strict: true });
+        const socket = net.connect({ host: "127.0.0.1", port: mock.port });
+        await new Promise((resolve) => socket.once("connect", resolve));
+        socket.write(encodeConnect({ version: "L01", connectNonce: 12345 }));
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        socket.write(encodeControl({ version: "1.0", protocol: PROTOCOL.PING }));
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        assert.deepEqual(mock.closures, ["wrong-version:1.0"]);
+        socket.destroy();
+        await mock.close();
+
+        const quiet = await startVersionMock(undefined, { versions: ["L01"], idleCloseMs: 100 });
+        const second = net.connect({ host: "127.0.0.1", port: quiet.port });
+        await new Promise((resolve) => second.once("connect", resolve));
+        second.write(encodeConnect({ version: "L01", connectNonce: 12345 }));
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        assert.deepEqual(quiet.closures, ["idle"]);
+        second.destroy();
+        await quiet.close();
+    });
+
+    test("the ping interval never exceeds half the advertised keepalive", () => {
+        const make = (extra) => new RoborockClient({ host: "127.0.0.1", localKey: LOCAL_KEY, ...extra });
+        const intervals = [];
+        const realSetInterval = global.setInterval;
+        global.setInterval = (fn, ms) => {
+            intervals.push(ms);
+            return realSetInterval(() => {}, 1e9);
+        };
+        try {
+            const a = make({});
+            a.startPing();
+            a.stopPing();
+            const b = make({ pingIntervalMs: 2000 });
+            b.startPing();
+            b.stopPing();
+        } finally {
+            global.setInterval = realSetInterval;
+        }
+        assert.deepEqual(intervals, [5000, 2000]);
+    });
+
+    test("one shared client takes many nodes without a MaxListeners warning", () => {
+        resetForTests();
+        const warnings = [];
+        const onWarning = (warning) => warnings.push(warning.name);
+        process.on("warning", onWarning);
+        try {
+            const session = require("../lib/session").acquire("many-nodes", {
+                host: "127.0.0.1",
+                port: 1,
+                localKey: LOCAL_KEY,
+                pingIntervalMs: 0
+            });
+            for (let node = 0; node < 14; node += 1) {
+                for (const event of ["status", "failure", "disconnect", "ready"]) {
+                    session.client.on(event, () => {});
+                }
+            }
+            assert.equal(session.client.listenerCount("status"), 14);
+            return new Promise((resolve) => setImmediate(() => {
+                process.removeListener("warning", onWarning);
+                resetForTests();
+                assert.deepEqual(warnings, []);
+                resolve();
+            }));
+        } catch (err) {
+            process.removeListener("warning", onWarning);
+            resetForTests();
+            throw err;
         }
     });
 

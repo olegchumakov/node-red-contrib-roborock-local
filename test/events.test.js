@@ -39,7 +39,14 @@ describe("status events", () => {
         assert.deepEqual(detectEvents(status({ state: 6, inCleaning: 3 }), status({ state: 8, inCleaning: 0 })), ["cleaning-finished"]);
     });
 
-    test("returning with in_cleaning set is not finished until the clean really ends", () => {
+    test("cleaning-finished fires when the robot clears in_cleaning, at the start of the return", () => {
+        const cleaning = status({ state: 5, inCleaning: 1 });
+        assert.deepEqual(detectEvents(cleaning, status({ state: 6, inCleaning: 0 })), ["cleaning-finished"]);
+        assert.deepEqual(detectEvents(status({ state: 6, inCleaning: 0 }), status({ state: 8, inCleaning: 0 })), []);
+        assert.deepEqual(detectEvents(paused(), status({ state: 6, inCleaning: 0 })), ["cleaning-finished"]);
+    });
+
+    test("returning with in_cleaning still set is not finished yet", () => {
         const cleaning = status({ state: 5, inCleaning: 1 });
         const returning = status({ state: 6, inCleaning: 1 });
         assert.deepEqual(detectEvents(cleaning, returning), []);
